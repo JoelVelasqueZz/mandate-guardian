@@ -18,8 +18,10 @@ then reconciles what was charged and recommends a refund when something doesn't 
   verdict stricter (approve -> ask_human), never override a block. `src/guardian/ai-reviewer.ts`
   implements it on top of a Gemini REST client (`src/guardian/llm.ts`); it is enabled only when
   `AI_API_KEY` and `AI_MODEL` are set. If the model fails or answers badly, the purchase goes to a
-  human. It is unit-tested with a fake model; **it has not been verified against the live Gemini API
-  yet**. Without those variables, explanations are deterministic text.
+  human. The prompt includes the current date (America/Guayaquil). It is unit-tested with a fake
+  model, and `npm run smoke:ai` runs four cases against the real model in `.env` (checked by the
+  author on Nov 3 with `gemini-3.1-flash-lite`, three runs with the same results; model answers can vary). Without those variables,
+  explanations are deterministic text.
 - **Reconciliation:** compares the approved price with an amount charged and flags a mismatch with a
   refund recommendation (`src/guardian/reconcile.ts`). The charged amount is currently sent by the
   caller; it is not yet read from PayPal.
@@ -56,6 +58,9 @@ Only the payment step and the smoke script need PayPal Sandbox credentials:
 cp .env.example .env     # then fill PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET (Sandbox)
 npm run smoke:paypal     # creates a Sandbox order and prints the buyer approval link
 ```
+
+To try the AI reviewer, set `AI_API_KEY` (Google AI Studio) and `AI_MODEL` in `.env` and run
+`npm run smoke:ai`.
 
 `npm run build` followed by `npm start` runs the compiled server.
 

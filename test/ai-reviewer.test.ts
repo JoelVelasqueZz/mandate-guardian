@@ -82,6 +82,36 @@ describe("AI reviewer", () => {
     expect(user).toContain(mandate.goal);
   });
 
+  describe("current date context", () => {
+    // 2026-11-04T03:00Z is still the evening of Nov 3 in Ecuador (UTC-5).
+    const clock = () => new Date("2026-11-04T03:00:00Z");
+    const withDelivery = { ...mandate, deliverBy: "2026-11-06" };
+    const normal: Proposal = { ...base, estimatedDelivery: "2026-11-05" };
+
+    it("tells the model today's date in America/Guayaquil, not UTC", async () => {
+      const llm = llmReturning(JSON.stringify({ suspicious: false, explanation: "Fine." }));
+      await review(withDelivery, normal, { spentThisMonth: 0 }, createAiReviewer(llm, clock));
+      const { system, user } = llm.calls[0];
+      expect(user).toContain('"today": "2026-11-03"');
+      expect(user).toContain('"deliverBy": "2026-11-06"');
+      expect(user).toContain('"estimatedDelivery": "2026-11-05"');
+      expect(system).toMatch(/future delivery date is normal/i);
+    });
+
+    it("keeps approve for a normal proposal with a future delivery when the model finds no other risk", async () => {
+      const llm = llmReturning(JSON.stringify({ suspicious: false, explanation: "Matches the gift intent." }));
+      const d = await review(withDelivery, normal, { spentThisMonth: 0 }, createAiReviewer(llm, clock));
+      expect(d.verdict).toBe("approve");
+    });
+
+    it("does not read the clock when the code is built, so the date is never hardcoded", async () => {
+      const llm = llmReturning(JSON.stringify({ suspicious: false, explanation: "Fine." }));
+      const reviewer = createAiReviewer(llm, () => new Date("2027-01-15T12:00:00Z"));
+      await review(withDelivery, normal, { spentThisMonth: 0 }, reviewer);
+      expect(llm.calls[0].user).toContain('"today": "2027-01-15"');
+    });
+  });
+
   it("is created only when both AI_API_KEY and AI_MODEL are set", () => {
     expect(aiReviewerFromEnv({})).toBeUndefined();
     expect(aiReviewerFromEnv({ AI_API_KEY: "k" })).toBeUndefined();
