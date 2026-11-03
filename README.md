@@ -38,7 +38,10 @@ then reconciles what was charged and recommends a refund when something doesn't 
   `fetch`): `POST /v1/search` with a price filter and `GET /v1/products/{id}`. Used when
   `CHANNEL3_API_KEY` is set. Without a key the app uses a small offline catalog and reports
   `"source": "demo"` everywhere, so demo data is never shown as live. The client is unit-tested with a
-  mocked HTTP layer; `npm run smoke:channel3` calls the live API (not yet run against the live API).
+  mocked HTTP layer; `npm run smoke:channel3` calls the live API. Checked by the author on Nov 3
+  against the live API: search and product re-read return title, offers with `price.price`,
+  `availability` and the merchant `domain` (no separate seller name), and a full `/shop` run proposed
+  a real product that the Guardian approved.
 - **Listing re-check:** before the Guardian reviews a proposal that has a `productId`, the server
   re-reads the live listing and sets `listedPrice` itself, so the `price_matches_listing` rule
   compares against the catalog, not against what the buyer claimed. If the listing cannot be re-read,
