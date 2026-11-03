@@ -14,9 +14,12 @@ then reconciles what was charged and recommends a refund when something doesn't 
   categories, delivery deadline and "price matches the live listing". Any failed rule blocks the
   proposal; a passing proposal above the mandate's human-confirmation threshold asks a person.
   See `src/guardian/rules.ts`.
-- **AI reviewer hook:** `src/guardian/guardian.ts` accepts an optional reviewer that can only make a
-  verdict stricter (approve -> ask_human), never override a block. **No AI model is connected yet**;
-  today every explanation is a deterministic text.
+- **AI reviewer:** `src/guardian/guardian.ts` accepts an optional reviewer that can only make a
+  verdict stricter (approve -> ask_human), never override a block. `src/guardian/ai-reviewer.ts`
+  implements it on top of a Gemini REST client (`src/guardian/llm.ts`); it is enabled only when
+  `AI_API_KEY` and `AI_MODEL` are set. If the model fails or answers badly, the purchase goes to a
+  human. It is unit-tested with a fake model; **it has not been verified against the live Gemini API
+  yet**. Without those variables, explanations are deterministic text.
 - **Reconciliation:** compares the approved price with an amount charged and flags a mismatch with a
   refund recommendation (`src/guardian/reconcile.ts`). The charged amount is currently sent by the
   caller; it is not yet read from PayPal.

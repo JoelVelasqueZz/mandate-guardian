@@ -4,12 +4,14 @@ import { randomUUID } from "node:crypto";
 import { MandateSchema, ProposalSchema, type AuditRecord } from "./types.js";
 import { review } from "./guardian/guardian.js";
 import { reconcile } from "./guardian/reconcile.js";
+import { aiReviewerFromEnv } from "./guardian/ai-reviewer.js";
 import { Store } from "./store.js";
 import { paypalFromEnv } from "./paypal/client.js";
 
 const app = express();
 app.use(express.json());
 const store = new Store();
+const aiReviewer = aiReviewerFromEnv(); // undefined unless AI_API_KEY and AI_MODEL are set
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
@@ -29,7 +31,7 @@ app.post("/api/proposals", async (req, res) => {
   const mandate = store.mandates.get(proposal.mandateId);
   if (!mandate) return res.status(404).json({ error: "mandate not found" });
 
-  const decision = await review(mandate, proposal, { spentThisMonth: store.spentThisMonth(mandate.id) } /*, aiReviewer */);
+  const decision = await review(mandate, proposal, { spentThisMonth: store.spentThisMonth(mandate.id) }, aiReviewer);
   const status = decision.verdict === "approve" ? "approved" : decision.verdict === "block" ? "blocked" : "awaiting_human";
   const record: AuditRecord = { proposal, decision, status, updatedAt: "" };
   store.upsert(record);
