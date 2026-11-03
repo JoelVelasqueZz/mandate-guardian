@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { MandateSchema, ProposalSchema, type AuditRecord, type Mandate, type Proposal } from "./types.js";
 import { review } from "./guardian/guardian.js";
 import { aiReviewerFromEnv } from "./guardian/ai-reviewer.js";
+import { verifyListing } from "./guardian/listing.js";
 import { llmFromEnv } from "./guardian/llm.js";
 import { catalogFromEnv, type Catalog } from "./channel3/client.js";
 import { runMandate } from "./mandate/agent.js";
@@ -38,28 +39,20 @@ app.post("/api/mandates", (req, res) => {
 });
 
 /**
- * Guardian side of a proposal: re-read the live listing (never trust the buyer's listedPrice),
- * run the rules and the AI reviewer, and store the audit record.
+ * Guardian side of a proposal. The price is read from the catalog by productId; a listedPrice sent
+ * by the client is always discarded. If the price cannot be verified, the rules block the proposal.
  */
 async function submitProposal(mandate: Mandate, proposal: Proposal): Promise<AuditRecord> {
-  let listingUnavailable = false;
-  if (proposal.productId) {
-    try {
-      const live = await catalog.getProduct(proposal.productId);
-      if (live) proposal.listedPrice = live.price;
-      else listingUnavailable = true;
-    } catch {
-      listingUnavailable = true;
-    }
-    if (listingUnavailable) delete proposal.listedPrice;
-  }
+  delete proposal.listedPrice;
+  const listing = await verifyListing(catalog, proposal);
+  if (listing.ok) proposal.listedPrice = listing.listedPrice;
 
-  const decision = await review(mandate, proposal, { spentThisMonth: store.spentThisMonth(mandate.id) }, aiReviewer);
-  if (listingUnavailable) {
-    // Can only make the verdict stricter, like the AI reviewer.
-    decision.findings.push({ rule: "listing_recheck", ok: true, detail: "The live listing could not be re-read; a human must confirm." });
-    if (decision.verdict === "approve") decision.verdict = "ask_human";
-  }
+  const decision = await review(
+    mandate,
+    proposal,
+    { spentThisMonth: store.spentThisMonth(mandate.id), priceVerification: listing },
+    aiReviewer,
+  );
   const status = decision.verdict === "approve" ? "approved" : decision.verdict === "block" ? "blocked" : "awaiting_human";
   const record: AuditRecord = { proposal, decision, status, updatedAt: "" };
   store.upsert(record);
