@@ -30,14 +30,32 @@ then reconciles what was charged and recommends a refund when something doesn't 
   the API** (`POST /api/proposals/:id/pay`, intent `AUTHORIZE`, returns the buyer approval link).
   Buyer approval, authorize, capture, void and refund are not wired into the API, and none of this has
   been verified end to end against the Sandbox yet.
-- **REST API** (Express, in-memory store, data is lost on restart) and **11 unit tests** for the
-  Guardian rules and reconciliation.
+- **Buyer agent, Mandate** (`src/mandate/agent.ts`): turns the mandate goal into a search query,
+  searches the catalog under the per-purchase cap, keeps in-stock items in the mandate currency and
+  proposes one. With `AI_API_KEY`/`AI_MODEL` set, the same Gemini model writes the query and picks
+  the best fit with a short reason; otherwise it takes the most relevant result. Listings are passed
+  to the model as untrusted data. **Mandate cannot pay:** it never imports the PayPal client (a unit
+  test enforces this) and never fills `listedPrice`.
+- **Product search with [Channel3](https://trychannel3.com)** (`src/channel3/client.ts`, plain
+  `fetch`): `POST /v1/search` with a price filter and `GET /v1/products/{id}`. Used when
+  `CHANNEL3_API_KEY` is set. Without a key the app uses a small offline catalog and reports
+  `"source": "demo"` everywhere, so demo data is never shown as live. The client is unit-tested with a
+  mocked HTTP layer; `npm run smoke:channel3` calls the live API (not yet run against the live API).
+- **Listing re-check:** before the Guardian reviews a proposal that has a `productId`, the server
+  re-reads the live listing and sets `listedPrice` itself, so the `price_matches_listing` rule
+  compares against the catalog, not against what the buyer claimed. If the listing cannot be re-read,
+  the proposal goes to a human.
+- **Natural-language mandates** (`src/mandate/parse-mandate.ts`, needs the AI model): turns a request
+  such as "a gift for my mom, max $40, by Friday" into a mandate draft for the user to review. The
+  model never invents a spending cap; missing caps come back as questions.
+- **REST API** (Express, in-memory store, data is lost on restart) and **41 unit tests** covering the
+  Guardian rules, reconciliation, the AI reviewer, Channel3 parsing, the buyer agent and the shop flow.
 
 ## Not built yet
 
-Buyer agent (Mandate) and product search with [Channel3](https://trychannel3.com), AI reviewer model,
-natural-language mandates, web UI and AG Grid dashboard, PayPal transaction lookup and dispute
-handling, deployment on Render. The dashboard feed (`GET /api/records`) exists; the dashboard does not.
+Web UI and AG Grid dashboard, PayPal buyer approval/capture/refund wired into the API, PayPal
+transaction lookup and dispute handling, deployment on Render. The dashboard feed
+(`GET /api/records`) exists; the dashboard does not.
 
 ## Quick start
 
@@ -62,14 +80,28 @@ npm run smoke:paypal     # creates a Sandbox order and prints the buyer approval
 To try the AI reviewer, set `AI_API_KEY` (Google AI Studio) and `AI_MODEL` in `.env` and run
 `npm run smoke:ai`.
 
+To search live products, set `CHANNEL3_API_KEY` and run
+`npm run smoke:channel3 -- "birthday gift for mom" 40`.
+
+Try the buyer agent without any keys (demo catalog):
+
+```bash
+curl -s -X POST localhost:3000/api/mandates -H "Content-Type: application/json" \
+  -d '{"goal":"a birthday gift for my mom","maxPerPurchase":40,"maxMonthly":100}'
+# then, with the returned id:
+curl -s -X POST localhost:3000/api/mandates/<id>/shop -H "Content-Type: application/json" -d '{}'
+```
+
 `npm run build` followed by `npm start` runs the compiled server.
 
 ## API
 
 | Method | Path | What it does |
 |---|---|---|
-| GET | `/api/health` | Health check |
+| GET | `/api/health` | Health check; also reports the catalog source and whether AI is on |
+| POST | `/api/mandates/parse` | Natural language to a mandate draft (needs the AI model) |
 | POST | `/api/mandates` | Create the user's spending rules |
+| POST | `/api/mandates/:id/shop` | Mandate searches and proposes; the Guardian reviews the proposal |
 | POST | `/api/proposals` | Submit a purchase proposal; Guardian reviews it |
 | POST | `/api/proposals/:id/confirm` | Human confirms a flagged proposal |
 | POST | `/api/proposals/:id/pay` | Create a PayPal Sandbox order for an approved proposal |

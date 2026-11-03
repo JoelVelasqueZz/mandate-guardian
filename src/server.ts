@@ -1,10 +1,14 @@
 import "dotenv/config";
 import express from "express";
 import { randomUUID } from "node:crypto";
-import { MandateSchema, ProposalSchema, type AuditRecord } from "./types.js";
+import { MandateSchema, ProposalSchema, type AuditRecord, type Mandate, type Proposal } from "./types.js";
 import { review } from "./guardian/guardian.js";
 import { reconcile } from "./guardian/reconcile.js";
 import { aiReviewerFromEnv } from "./guardian/ai-reviewer.js";
+import { llmFromEnv } from "./guardian/llm.js";
+import { catalogFromEnv, type Catalog } from "./channel3/client.js";
+import { runMandate } from "./mandate/agent.js";
+import { parseMandateText } from "./mandate/parse-mandate.js";
 import { Store } from "./store.js";
 import { paypalFromEnv } from "./paypal/client.js";
 
@@ -12,10 +16,21 @@ const app = express();
 app.use(express.json());
 const store = new Store();
 const aiReviewer = aiReviewerFromEnv(); // undefined unless AI_API_KEY and AI_MODEL are set
+const llm = llmFromEnv(); // same model, used by the buyer agent
+const catalog: Catalog = catalogFromEnv(); // live Channel3 with CHANNEL3_API_KEY, labeled demo data otherwise
 
-app.get("/api/health", (_req, res) => res.json({ ok: true }));
+app.get("/api/health", (_req, res) => res.json({ ok: true, catalog: catalog.source, ai: Boolean(llm) }));
 
-// 1. The user sets a mandate (the AI that turns natural language into this schema comes later).
+// 0. Natural language -> mandate draft. The user edits and saves it with POST /api/mandates.
+app.post("/api/mandates/parse", async (req, res) => {
+  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+  if (!text) return res.status(400).json({ error: "text is required" });
+  if (!llm) return res.status(503).json({ error: "AI model not configured (set AI_API_KEY and AI_MODEL)" });
+  const result = await parseMandateText(text, llm);
+  res.status(result.ok ? 200 : 422).json(result);
+});
+
+// 1. The user sets a mandate.
 app.post("/api/mandates", (req, res) => {
   const parsed = MandateSchema.safeParse({ id: randomUUID(), ...req.body });
   if (!parsed.success) return res.status(400).json(parsed.error.flatten());
@@ -23,19 +38,57 @@ app.post("/api/mandates", (req, res) => {
   res.status(201).json(parsed.data);
 });
 
-// 2. The buyer agent (Mandate) submits a proposal. The Guardian reviews it BEFORE any payment.
-app.post("/api/proposals", async (req, res) => {
-  const parsed = ProposalSchema.safeParse({ id: randomUUID(), ...req.body });
-  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
-  const proposal = parsed.data;
-  const mandate = store.mandates.get(proposal.mandateId);
-  if (!mandate) return res.status(404).json({ error: "mandate not found" });
+/**
+ * Guardian side of a proposal: re-read the live listing (never trust the buyer's listedPrice),
+ * run the rules and the AI reviewer, and store the audit record.
+ */
+async function submitProposal(mandate: Mandate, proposal: Proposal): Promise<AuditRecord> {
+  let listingUnavailable = false;
+  if (proposal.productId) {
+    try {
+      const live = await catalog.getProduct(proposal.productId);
+      if (live) proposal.listedPrice = live.price;
+      else listingUnavailable = true;
+    } catch {
+      listingUnavailable = true;
+    }
+    if (listingUnavailable) delete proposal.listedPrice;
+  }
 
   const decision = await review(mandate, proposal, { spentThisMonth: store.spentThisMonth(mandate.id) }, aiReviewer);
+  if (listingUnavailable) {
+    // Can only make the verdict stricter, like the AI reviewer.
+    decision.findings.push({ rule: "listing_recheck", ok: true, detail: "The live listing could not be re-read; a human must confirm." });
+    if (decision.verdict === "approve") decision.verdict = "ask_human";
+  }
   const status = decision.verdict === "approve" ? "approved" : decision.verdict === "block" ? "blocked" : "awaiting_human";
   const record: AuditRecord = { proposal, decision, status, updatedAt: "" };
   store.upsert(record);
-  res.status(201).json(record);
+  return record;
+}
+
+// 2. A proposal is submitted. The Guardian reviews it BEFORE any payment.
+app.post("/api/proposals", async (req, res) => {
+  const parsed = ProposalSchema.safeParse({ id: randomUUID(), ...req.body });
+  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+  const mandate = store.mandates.get(parsed.data.mandateId);
+  if (!mandate) return res.status(404).json({ error: "mandate not found" });
+  res.status(201).json(await submitProposal(mandate, parsed.data));
+});
+
+// 2b. The buyer agent (Mandate) shops for a mandate and its proposal goes straight to the Guardian.
+app.post("/api/mandates/:id/shop", async (req, res) => {
+  const mandate = store.mandates.get(req.params.id);
+  if (!mandate) return res.status(404).json({ error: "mandate not found" });
+  const query = typeof req.body?.query === "string" ? req.body.query : undefined;
+  try {
+    const run = await runMandate({ mandate, catalog, llm, query });
+    if (!run.proposal) return res.json({ run });
+    const record = await submitProposal(mandate, ProposalSchema.parse({ id: randomUUID(), ...run.proposal }));
+    res.status(201).json({ run, record });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
 });
 
 // 3. A human confirms a purchase that Guardian flagged.

@@ -17,6 +17,7 @@ export type Mandate = z.infer<typeof MandateSchema>;
 export const ProposalSchema = z.object({
   id: z.string(),
   mandateId: z.string(),
+  productId: z.string().optional(), // catalog id, lets the Guardian re-read the live listing
   title: z.string(),
   seller: z.string().optional(),
   category: z.string().optional(),
