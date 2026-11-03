@@ -22,14 +22,12 @@ then reconciles what was charged and recommends a refund when something doesn't 
   model, and `npm run smoke:ai` runs four cases against the real model in `.env` (checked by the
   author on Nov 3 with `gemini-3.1-flash-lite`, three runs with the same results; model answers can vary). Without those variables,
   explanations are deterministic text.
-- **Reconciliation:** compares the approved price with an amount charged and flags a mismatch with a
-  refund recommendation (`src/guardian/reconcile.ts`). The charged amount is currently sent by the
-  caller; it is not yet read from PayPal.
-- **PayPal Sandbox client** (`src/paypal/client.ts`, plain `fetch`, no SDK): create order,
-  authorize, capture, void, refund and get order are implemented. **Only "create order" is wired into
-  the API** (`POST /api/proposals/:id/pay`, intent `AUTHORIZE`, returns the buyer approval link).
-  Buyer approval, authorize, capture, void and refund are not wired into the API, and none of this has
-  been verified end to end against the Sandbox yet.
+- **Reconciliation:** the payment API reads the PayPal capture amount and currency. An optional
+  demo overcharge scenario is labeled as simulated and keeps the real captured amount unchanged.
+- **PayPal Sandbox integration:** server-side create, buyer approval link/return, authorize,
+  capture, void, full refund, capture lookup, Transaction Search and disputes read methods.
+  The payment routes use a private demo access key, deterministic idempotency keys,
+  state checks and per-proposal locks. **Real sandbox execution is still pending.**
 - **Buyer agent, Mandate** (`src/mandate/agent.ts`): turns the mandate goal into a search query,
   searches the catalog under the per-purchase cap, keeps in-stock items in the mandate currency and
   proposes one. With `AI_API_KEY`/`AI_MODEL` set, the same Gemini model writes the query and picks
@@ -48,14 +46,13 @@ then reconciles what was charged and recommends a refund when something doesn't 
 - **Natural-language mandates** (`src/mandate/parse-mandate.ts`, needs the AI model): turns a request
   such as "a gift for my mom, max $40, by Friday" into a mandate draft for the user to review. The
   model never invents a spending cap; missing caps come back as questions.
-- **REST API** (Express, in-memory store, data is lost on restart) and **41 unit tests** covering the
-  Guardian rules, reconciliation, the AI reviewer, Channel3 parsing, the buyer agent and the shop flow.
+- **REST API** (Express, in-memory store, data is lost on restart) with unit tests for the Guardian, AI reviewer, buyer agent, Channel3 and PayPal routes.
+
+See [PayPal setup and frontend handoff](docs/PAYPAL-TESTING.md).
 
 ## Not built yet
 
-Web UI and AG Grid dashboard, PayPal buyer approval/capture/refund wired into the API, PayPal
-transaction lookup and dispute handling, deployment on Render. The dashboard feed
-(`GET /api/records`) exists; the dashboard does not.
+Web UI and AG Grid dashboard, automatic dispute submission, durable storage, webhook handling, user authentication, deployment on Render.
 
 ## Quick start
 
@@ -70,7 +67,8 @@ npm run typecheck
 npm run dev              # API on http://localhost:3000
 ```
 
-Only the payment step and the smoke script need PayPal Sandbox credentials:
+Payment routes and the smoke script need server-side PayPal Sandbox credentials.
+The routes also require a random DEMO_API_KEY and APP_BASE_URL in .env:
 
 ```bash
 cp .env.example .env     # then fill PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET (Sandbox)
@@ -105,7 +103,7 @@ curl -s -X POST localhost:3000/api/mandates/<id>/shop -H "Content-Type: applicat
 | POST | `/api/proposals` | Submit a purchase proposal; Guardian reviews it |
 | POST | `/api/proposals/:id/confirm` | Human confirms a flagged proposal |
 | POST | `/api/proposals/:id/pay` | Create a PayPal Sandbox order for an approved proposal |
-| POST | `/api/proposals/:id/reconcile` | Compare the approved price with a charged amount |
+| POST | `/api/proposals/:id/reconcile` | Read the PayPal capture and compare amount/currency |
 | GET | `/api/records` | Audit records |
 
 ## Security notes
@@ -116,3 +114,6 @@ curl -s -X POST localhost:3000/api/mandates/<id>/shop -H "Content-Type: applicat
 ## License
 
 MIT
+
+The table above shows the original core API. For authorize/capture/void/refund, callbacks,
+new pending states and the required demo header, use [PAYPAL-TESTING.md](docs/PAYPAL-TESTING.md).

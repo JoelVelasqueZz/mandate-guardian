@@ -5,12 +5,12 @@ export class Store {
   mandates = new Map<string, Mandate>();
   records = new Map<string, AuditRecord>();
 
-  spentThisMonth(mandateId: string, now = new Date()): number {
+  spentThisMonth(mandateId: string, now = new Date(), excludeProposalId?: string): number {
     let total = 0;
     for (const r of this.records.values()) {
-      if (r.proposal.mandateId !== mandateId) continue;
-      if (!["authorized", "captured", "reconciled", "alert"].includes(r.status)) continue;
-      const d = new Date(r.updatedAt);
+      if (r.proposal.id === excludeProposalId || r.proposal.mandateId !== mandateId) continue;
+      if (!["approved", "awaiting_paypal", "authorized", "capture_pending", "captured", "reconciled", "alert", "refund_pending"].includes(r.status)) continue;
+      const d = new Date(r.paypal?.capturedAt ?? r.createdAt ?? r.updatedAt);
       if (d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth()) {
         total += r.paypal?.charged ?? r.proposal.price;
       }
@@ -20,6 +20,7 @@ export class Store {
 
   upsert(record: AuditRecord) {
     record.updatedAt = new Date().toISOString();
+    record.createdAt ??= record.updatedAt;
     this.records.set(record.proposal.id, record);
   }
 }
