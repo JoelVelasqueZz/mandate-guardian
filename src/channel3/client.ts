@@ -2,8 +2,8 @@
  * Channel3 product search, plain fetch like the PayPal client (no SDK).
  * Docs: https://docs.trychannel3.com (POST /v1/search, GET /v1/products/{id}, header x-api-key).
  *
- * Not yet verified against the live API: the response is parsed defensively and every
- * listing is normalized to `ProductHit`. Fix `normalizeOffer` once a real response is captured.
+ * Checked against the live API on Nov 3: offers carry `price.price`, `currency`, `availability`
+ * ("InStock") and the merchant `domain`; there is no separate seller name. Parsing stays defensive.
  */
 
 /** One product as the rest of the app sees it. Everything here is untrusted web data. */
