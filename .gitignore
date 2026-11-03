@@ -5,3 +5,6 @@ dist
 !.env.example
 *.log
 .DS_Store
+
+# Sandbox responses and installer backups (private)
+.local/

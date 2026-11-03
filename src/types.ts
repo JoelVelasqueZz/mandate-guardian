@@ -17,6 +17,7 @@ export type Mandate = z.infer<typeof MandateSchema>;
 export const ProposalSchema = z.object({
   id: z.string(),
   mandateId: z.string(),
+  productId: z.string().optional(), // catalog id, lets the Guardian re-read the live listing
   title: z.string(),
   seller: z.string().optional(),
   category: z.string().optional(),
@@ -50,6 +51,9 @@ export type PaymentStatus =
   | "approved"
   | "blocked"
   | "awaiting_human"
+  | "awaiting_paypal"
+  | "capture_pending"
+  | "refund_pending"
   | "authorized"
   | "captured"
   | "voided"
@@ -64,11 +68,20 @@ export interface AuditRecord {
   status: PaymentStatus;
   paypal?: {
     orderId?: string;
+    intent?: "AUTHORIZE" | "CAPTURE";
+    approveUrl?: string;
+    returnState?: string;
+    captureStatus?: string;
+    refundStatus?: string;
+    chargedCurrency?: string;
+    capturedAt?: string;
     authorizationId?: string;
     captureId?: string;
     refundId?: string;
     charged?: number;
   };
-  reconciliation?: { match: boolean; detail: string };
+  reconciliation?: { match: boolean; detail: string; source?: "paypal_capture" | "simulated" };
+  demo?: { simulated: true; charged: number };
+  createdAt?: string;
   updatedAt: string;
 }

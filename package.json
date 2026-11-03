@@ -10,7 +10,10 @@
     "start": "node dist/src/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "smoke:paypal": "tsx scripts/paypal-smoke.ts"
+    "smoke:paypal": "node --import tsx scripts/paypal-smoke.ts",
+    "smoke:ai": "tsx scripts/ai-reviewer-smoke.ts",
+    "smoke:channel3": "tsx scripts/channel3-smoke.ts",
+    "edison:paypal": "node --import tsx scripts/edison-paypal.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

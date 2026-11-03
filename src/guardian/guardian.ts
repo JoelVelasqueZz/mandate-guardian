@@ -25,7 +25,8 @@ export async function review(
 
   if (ai) {
     const review = await ai({ mandate, proposal, ruleFindings: findings });
-    explanation = review.explanation || explanation;
+    // Keep the rule-based reason on a block; the AI text only adds to it.
+    explanation = verdict === "block" ? `${explanation} ${review.explanation}`.trim() : review.explanation || explanation;
     // The AI can only escalate: approve -> ask_human.
     if (review.suspicious && verdict === "approve") verdict = "ask_human";
   }
