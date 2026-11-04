@@ -2,7 +2,7 @@
 
 > The agent that spends is not the one that watches.
 
-Built for the [PayPal AI Hackathon 2026](https://paypalaihackathon.devpost.com/). **Work in progress.**
+Built for the [PayPal AI Hackathon 2026](https://paypalaihackathon.devpost.com/). **Sandbox prototype.**
 
 The idea: a buyer agent (**Mandate**) can only *propose* purchases inside the rules a user sets.
 An independent auditor (**Guardian**) approves, blocks or asks a human *before* any PayPal payment,
@@ -29,9 +29,9 @@ then reconciles what was charged and recommends a refund when something doesn't 
   buyer approval link and return/cancel pages, authorize, capture, void, full refund, order and
   capture lookup, Transaction Search and disputes read methods. Payment routes check the proposal
   status, re-run the Guardian rules before authorizing or capturing, use deterministic idempotency
-  keys and lock each proposal while an operation runs. Set `PAYPAL_PLAN` to `A` (authorize, then
-  capture or void) or `B` (capture directly after buyer approval); the team has not made the final
-  choice. All payment routes require `DEMO_API_KEY` (see Configuration).
+  keys and lock each proposal while an operation runs. **Plan A is the main flow.** Authorize
+  the buyer-approved order, then capture or void it. Plan B remains the tested direct-capture
+  fallback. Human confirmation and payment routes require `DEMO_API_KEY`.
 - **Buyer agent, Mandate** (`src/mandate/agent.ts`): turns the mandate goal into a search query,
   searches the catalog under the per-purchase cap, keeps in-stock items in the mandate currency and
   proposes one. With `AI_API_KEY`/`AI_MODEL` set, the same Gemini model writes the query and picks
@@ -55,31 +55,24 @@ then reconciles what was charged and recommends a refund when something doesn't 
 - **Natural-language mandates** (`src/mandate/parse-mandate.ts`, needs the AI model): turns a request
   such as "a gift for my mom, max $40, by Friday" into a mandate draft for the user to review. The
   model never invents a spending cap; missing caps come back as questions.
-- **REST API** (Express, in-memory store, data is lost on restart) with unit tests for the Guardian, AI reviewer, buyer agent, Channel3 and PayPal routes.
+- **Dashboard and REST API:** the AG Grid dashboard shows Guardian decisions, PayPal Sandbox
+  states and reconciliation. Mock mode uses browser-only sample rows. API Backend mode loads
+  audit records from the Express server and supports the full Plan A checkout sequence.
+  Data is held in memory and cleared on restart.
 
-See [PayPal setup and frontend handoff](docs/PAYPAL-TESTING.md).
+See the [PayPal Sandbox setup, demo run and Render instructions](docs/PAYPAL-TESTING.md).
 
 ## Verification status
 
-- **Unit tests:** the project tests, typecheck and build pass locally with mocked PayPal, Channel3 and
-  model calls. They check the logic, not the real services.
-- **PayPal Sandbox:** run by Edison on the PayPal branch before integration (details in
-  [docs/SANDBOX-RESULTS.md](docs/SANDBOX-RESULTS.md)): order, buyer approval, authorize, capture, void,
-  refund, a direct-capture flow and a test dispute worked. **Transaction Search returned 403** (insufficient
-  permissions), so reconciliation relies on the capture response. Still to confirm: how many steps the
-  buyer approval takes and whether returning to the app works, and whether voiding an authorization
-  releases the buyer's hold.
-- **Channel3:** checked against the live API by Cristopher on the Mandate branch before integration. It
-  returns title, price, availability and the merchant domain, but no seller name and no delivery date.
-- **Gemini:** `npm run smoke:ai` was run with `gemini-3.1-flash-lite` on the AI reviewer branch.
-- **After integrating these branches, no real PayPal, Channel3 or Gemini call was repeated on the
-  combined code.** The combined flow (search, Guardian review, payment, reconciliation, refund) has not
-  been tested end to end.
+| Scope | Evidence |
+|---|---|
+| Combined app | Automated tests exercise two complete Plan A rounds using mocked PayPal HTTP and the demo catalog. They verify approval, duplicate-order prevention, rejection of a blocked payment, capture, reconciliation, human-confirmed refund and separate void. |
+| PayPal Sandbox | Edison verified the direct CLI Plan A and B flows and a separate buyer dispute. Transaction Search returned HTTP 403. The app uses the capture lookup for reconciliation. See [Sandbox results](docs/SANDBOX-RESULTS.md). |
+| Channel3 and Gemini | The team verified each provider separately before integration. The combined flow with the real Sandbox buyer and live providers still needs a new run. |
+| Render | The Blueprint, compiled app and checkout origin logic are ready. Deployment and a checkout against the published URL need to be verified on the team's service. |
 
-## Not built yet
-
-Web UI and AG Grid dashboard, automatic dispute submission, durable storage, webhook handling, user
-authentication and deployment on Render.
+The demo is single-user. Durable storage, individual authentication, webhooks and
+automatic dispute submission are outside its current scope.
 
 ## Quick start
 
@@ -88,11 +81,18 @@ Requires Node.js 22.
 ```bash
 git clone https://github.com/JoelVelasqueZz/mandate-guardian.git
 cd mandate-guardian
-npm install
-npm test                 # unit tests (mocked services)
+npm ci
+npm test
 npm run typecheck
-npm run dev              # API on http://localhost:3000
+npm run build
+npm start
 ```
+
+Open [localhost:3000](http://localhost:3000). The dashboard opens in Mock mode for a
+credential-free walkthrough. Switch to **API Backend** to use the integrated server.
+For PayPal checkout, configure the seller and separate Personal Sandbox buyer
+using the [testing guide](docs/PAYPAL-TESTING.md). Run `npm run verify:plan-a`
+in a second terminal to produce two audit files.
 
 ## Configuration
 
@@ -103,14 +103,12 @@ Copy `.env.example` to `.env` and fill only what you need. Never commit `.env`.
 | `AI_API_KEY`, `AI_MODEL` | AI reviewer, buyer agent and natural-language mandates (Google AI Studio key). Empty: rules only. |
 | `CHANNEL3_API_KEY` | Live product search. Empty: labeled offline demo catalog. |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | PayPal **Sandbox** app credentials. |
-| `PAYPAL_PLAN`, `APP_BASE_URL` | Payment flow (`A` or `B`) and the base URL for PayPal return pages (HTTPS, or HTTP on localhost). |
-| `DEMO_API_KEY` | **Required by every payment route.** Set it to a random string of your own; it is a shared demo access key, not a PayPal credential. Without it the payment routes answer 503. Clients send `Authorization: Bearer <DEMO_API_KEY>`. |
+| `PAYPAL_PLAN`, `APP_BASE_URL` | Set Plan A. For local runs, set the app origin. Render provides the HTTPS origin when `APP_BASE_URL` is unset. |
+| `DEMO_API_KEY` | **Required for human confirmation and payment routes.** Set it to a random string of your own; it is a shared demo access key, not a PayPal credential. Without it the payment routes answer 503. Clients send `Authorization: Bearer <DEMO_API_KEY>`. |
 | `ENABLE_DEMO_SCENARIO` | Optional: `true` enables the labeled simulated overcharge. |
 
-```bash
-cp .env.example .env
-npm run smoke:paypal     # creates a Sandbox order and prints the buyer approval link
-```
+Use `npm run smoke:paypal` for a direct Sandbox order or
+`npm run verify:plan-a` for the integrated demo with its buyer approval and refund prompts.
 
 To try the AI reviewer, set `AI_API_KEY` (Google AI Studio) and `AI_MODEL` in `.env` and run
 `npm run smoke:ai`.
@@ -127,8 +125,6 @@ curl -s -X POST localhost:3000/api/mandates -H "Content-Type: application/json" 
 curl -s -X POST localhost:3000/api/mandates/<id>/shop -H "Content-Type: application/json" -d '{}'
 ```
 
-`npm run build` followed by `npm start` runs the compiled server.
-
 ## API
 
 "Demo key" means the route requires `Authorization: Bearer <DEMO_API_KEY>`. The other routes have no
@@ -136,13 +132,14 @@ authentication; this is a single-user demo API.
 
 | Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | `/api/health` | none | Health check; reports the catalog source and whether AI is on |
+| GET | `/api/health` | none | Health, catalog source, AI status, selected PayPal plan and demo overcharge flag |
+| GET | `/api/mandates` | none | List mandates for the dashboard |
 | POST | `/api/mandates/parse` | none | Natural language to a mandate draft (needs the AI model) |
 | POST | `/api/mandates` | none | Create the user's spending rules |
 | POST | `/api/mandates/:id/shop` | none | Mandate searches the catalog and proposes; the Guardian reviews the proposal |
 | POST | `/api/proposals` | none | Submit a purchase proposal; the Guardian reviews it |
-| POST | `/api/proposals/:id/confirm` | none | A human confirms a proposal the Guardian flagged |
-| GET | `/api/records` | none | Audit records |
+| POST | `/api/proposals/:id/confirm` | demo key | A human confirms a proposal the Guardian flagged |
+| GET | `/api/records` | none | Audit records with checkout URLs and return tokens omitted |
 | POST | `/api/proposals/:id/pay` | demo key | Create the PayPal Sandbox order for an approved proposal; returns the buyer approval link |
 | GET | `/api/proposals/:id/paypal` | demo key | Read the PayPal order, to check buyer approval |
 | POST | `/api/proposals/:id/authorize` | demo key | Plan A: authorize the buyer-approved order |
@@ -160,7 +157,8 @@ Payment details and the request contract are in [docs/PAYPAL-TESTING.md](docs/PA
 
 - PayPal **Sandbox** only. Never commit `.env`; it is git-ignored.
 - Spending caps live in deterministic code and are not delegated to a model.
-- Payment routes need `DEMO_API_KEY`; the rest of the API has no authentication, so do not expose it publicly as is.
+- Use only synthetic mandates and Sandbox data in the shared demo. The demo key gates
+  confirmation and payment. Public audit rows omit checkout links and return tokens.
 
 ## License
 

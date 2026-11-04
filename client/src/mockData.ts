@@ -54,7 +54,6 @@ export const INITIAL_RECORDS: AuditRecord[] = [
     paypal: {
       orderId: "PAYID-MZ409219A98",
       intent: "CAPTURE",
-      approveUrl: "https://www.sandbox.paypal.com/checkoutnow?token=PAYID-MZ409219A98",
       captureId: "CAP-998811A-LIVE",
       captureStatus: "COMPLETED",
       charged: 348.0,
@@ -157,8 +156,6 @@ export const INITIAL_RECORDS: AuditRecord[] = [
     paypal: {
       orderId: "SANDBOX-ORD-449108",
       intent: "CAPTURE",
-      approveUrl: "https://www.sandbox.paypal.com/checkoutnow?token=SANDBOX-ORD-449108",
-      returnState: "ret-state-449108",
     },
     createdAt: "2026-11-04T13:40:00Z",
     updatedAt: "2026-11-04T13:45:00Z",
@@ -193,7 +190,6 @@ export const INITIAL_RECORDS: AuditRecord[] = [
       orderId: "SANDBOX-ORD-667123",
       intent: "AUTHORIZE",
       authorizationId: "AUTH-88912-V1",
-      approveUrl: "https://www.sandbox.paypal.com/checkoutnow?token=SANDBOX-ORD-667123",
     },
     createdAt: "2026-11-04T10:15:00Z",
     updatedAt: "2026-11-04T10:25:00Z",
