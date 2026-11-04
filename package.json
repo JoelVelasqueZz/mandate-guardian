@@ -15,7 +15,8 @@
     "smoke:paypal": "node --import tsx scripts/paypal-smoke.ts",
     "smoke:ai": "tsx scripts/ai-reviewer-smoke.ts",
     "smoke:channel3": "tsx scripts/channel3-smoke.ts",
-    "edison:paypal": "node --import tsx scripts/edison-paypal.ts"
+    "edison:paypal": "node --import tsx scripts/edison-paypal.ts",
+    "verify:plan-a": "tsx scripts/verify-plan-a.ts"
   },
   "dependencies": {
     "ag-grid-community": "^36.3.0",

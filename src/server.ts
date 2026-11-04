@@ -32,7 +32,11 @@ const aiReviewer = aiReviewerFromEnv(); // undefined unless AI_API_KEY and AI_MO
 const llm = llmFromEnv(); // same model, used by the buyer agent
 const catalog: Catalog = catalogFromEnv(); // live Channel3 with CHANNEL3_API_KEY, labeled demo data otherwise
 
-app.get("/api/health", (_req, res) => res.json({ ok: true, catalog: catalog.source, ai: Boolean(llm) }));
+app.get("/api/health", (_req, res) => res.json({
+  ok: true, catalog: catalog.source, ai: Boolean(llm),
+  paypalPlan: process.env.PAYPAL_PLAN,
+  demoOvercharge: process.env.ENABLE_DEMO_SCENARIO === "true",
+}));
 
 // 0. Natural language -> mandate draft. The user edits and saves it with POST /api/mandates.
 app.post("/api/mandates/parse", async (req, res) => {
