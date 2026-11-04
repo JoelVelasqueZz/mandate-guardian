@@ -14,23 +14,17 @@ const SettingsModal = lazy(() => import("./components/SettingsModal").then((m) =
 const NewProposalModal = lazy(() => import("./components/NewProposalModal").then((m) => ({ default: m.NewProposalModal })));
 
 export const App: React.FC = () => {
-  // Mode selection: defaults to mock mode with rich initial data
-  const [isMockMode, setIsMockMode] = useState<boolean>(true);
-
-  // Core state
-  const [records, setRecords] = useState<AuditRecord[]>(INITIAL_RECORDS);
-  const [mandates, setMandates] = useState<Mandate[]>(INITIAL_MANDATES);
-  const [activeMandate, setActiveMandate] = useState<Mandate>(INITIAL_MANDATES[0]);
-  const [systemHealth, setSystemHealth] = useState<SystemHealth | null>({
-    ok: true,
-    catalog: "channel3",
-    ai: true,
+  const [isMockMode, setIsMockMode] = useState(() => {
+    return !new URLSearchParams(window.location.search).has("checkout") &&
+      sessionStorage.getItem("mg_api_mode") !== "true";
   });
+  const [records, setRecords] = useState<AuditRecord[]>(isMockMode ? INITIAL_RECORDS : []);
+  const [mandates, setMandates] = useState<Mandate[]>(isMockMode ? INITIAL_MANDATES : []);
+  const [activeMandate, setActiveMandate] = useState<Mandate | undefined>(mandates[0]);
+  const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
 
-  // Demo key for PayPal Sandbox routes
-  const [demoKey, setDemoKey] = useState<string>(() => {
-    return localStorage.getItem("mg_demo_key") || "demo-key-guardian-2026";
-  });
+  // Keep the demo key in this tab through the Sandbox redirect.
+  const [demoKey, setDemoKey] = useState(() => sessionStorage.getItem("mg_demo_key") ?? "");
 
   // UI state
   const [selectedRecord, setSelectedRecord] = useState<AuditRecord | null>(null);
@@ -46,7 +40,7 @@ export const App: React.FC = () => {
 
   const saveDemoKey = (key: string) => {
     setDemoKey(key);
-    localStorage.setItem("mg_demo_key", key);
+    sessionStorage.setItem("mg_demo_key", key);
     showToast("success", "Demo API Key actualizada.");
   };
 
@@ -55,14 +49,13 @@ export const App: React.FC = () => {
     if (isMockMode) return;
     setLoading(true);
     try {
-      const [health, recs] = await Promise.all([
-        api.getHealth().catch(() => null),
-        api.getRecords().catch(() => []),
+      const [health, recs, savedMandates] = await Promise.all([
+        api.getHealth(), api.getRecords(), api.getMandates(),
       ]);
-      if (health) setSystemHealth(health);
-      if (recs && recs.length > 0) {
-        setRecords(recs);
-      }
+      setSystemHealth(health);
+      setRecords(recs);
+      setMandates(savedMandates);
+      setActiveMandate((previous) => savedMandates.find((mandate) => mandate.id === previous?.id) ?? savedMandates[0]);
       showToast("info", "Datos actualizados desde el backend.");
     } catch {
       showToast("error", "No se pudo sincronizar con el backend.");
@@ -77,14 +70,16 @@ export const App: React.FC = () => {
     }
   }, [isMockMode, fetchLiveData]);
 
-  // Initial check on mount
-  useEffect(() => {
-    api.getHealth()
-      .then((h) => setSystemHealth(h))
-      .catch(() => {
-        // Fallback gracefully if backend is not started yet
-      });
-  }, []);
+  const changeMode = (mock: boolean) => {
+    if (mock === isMockMode || loading) return;
+    sessionStorage.setItem("mg_api_mode", String(!mock));
+    setSelectedRecord(null);
+    setRecords(mock ? INITIAL_RECORDS : []);
+    setMandates(mock ? INITIAL_MANDATES : []);
+    setActiveMandate(mock ? INITIAL_MANDATES[0] : undefined);
+    setSystemHealth(null);
+    setIsMockMode(mock);
+  };
 
   const handleResetMocks = () => {
     setRecords(INITIAL_RECORDS);
@@ -106,7 +101,7 @@ export const App: React.FC = () => {
         );
         showToast("success", "Propuesta aprobada por confirmación humana.");
       } else {
-        const updated = await api.confirmHuman(id);
+        const updated = await api.confirmHuman(id, demoKey);
         setRecords((prev) => prev.map((r) => (r.proposal.id === id ? updated : r)));
         showToast("success", "Propuesta aprobada en el servidor.");
       }
@@ -121,7 +116,6 @@ export const App: React.FC = () => {
     setLoading(true);
     try {
       if (isMockMode) {
-        const approveUrl = `https://www.sandbox.paypal.com/checkoutnow?token=SANDBOX-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
         setRecords((prev) =>
           prev.map((r) => {
             if (r.proposal.id !== id) return r;
@@ -131,20 +125,18 @@ export const App: React.FC = () => {
               paypal: {
                 ...r.paypal,
                 orderId: `SANDBOX-ORD-${Math.floor(100000 + Math.random() * 900000)}`,
-                intent: "CAPTURE",
-                approveUrl,
+                intent: "AUTHORIZE",
               },
               updatedAt: new Date().toISOString(),
             };
           })
         );
-        showToast("info", "Orden PayPal creada. Abriendo checkout Sandbox en nueva pestaña...");
-        window.open(approveUrl, "_blank");
+        showToast("info", "Simulated checkout created.");
       } else {
         const result = await api.payWithPayPal(id, demoKey);
         setRecords((prev) => prev.map((r) => (r.proposal.id === id ? result.record : r)));
-        showToast("success", "Orden PayPal generada. Redirigiendo a Sandbox...");
-        window.open(result.approveUrl, "_blank");
+        sessionStorage.setItem("mg_api_mode", "true");
+        window.location.assign(result.approveUrl);
       }
     } catch (e: any) {
       showToast("error", e.message);
@@ -173,6 +165,11 @@ export const App: React.FC = () => {
         );
         showToast("success", "Fondos autorizados exitosamente en PayPal Sandbox (Plan A).");
       } else {
+        const { order } = await api.getPayPalOrder(id, demoKey);
+        if (!["APPROVED", "COMPLETED"].includes(order.status)) {
+          showToast("info", "Approve the order in PayPal Sandbox first.");
+          return;
+        }
         const updated = await api.authorize(id, demoKey);
         setRecords((prev) => prev.map((r) => (r.proposal.id === id ? updated : r)));
         showToast("success", "Orden autorizada en PayPal.");
@@ -210,7 +207,9 @@ export const App: React.FC = () => {
       } else {
         const updated = await api.capture(id, demoKey);
         setRecords((prev) => prev.map((r) => (r.proposal.id === id ? updated : r)));
-        showToast("success", "Pago capturado.");
+        if (updated.status === "capture_pending") showToast("info", "PayPal capture is pending.");
+        else if (updated.status === "alert") showToast("error", "PayPal capture needs review.");
+        else showToast("success", "Pago capturado.");
       }
     } catch (e: any) {
       showToast("error", e.message);
@@ -258,17 +257,19 @@ export const App: React.FC = () => {
                 detail: match
                   ? `Monto capturado ($${charged.toFixed(2)} USD) coincide 1:1 con la propuesta aprobada.`
                   : `Discrepancia detectada: capturado $${charged.toFixed(2)} vs aprobado $${r.proposal.price.toFixed(2)}.`,
-                source: "paypal_capture",
+                source: "simulated",
               },
               updatedAt: new Date().toISOString(),
             };
           })
         );
-        showToast("success", "Conciliación completada contra registro de captura PayPal.");
+        showToast("success", "Simulated capture reconciled.");
       } else {
         const updated = await api.reconcile(id, demoKey);
         setRecords((prev) => prev.map((r) => (r.proposal.id === id ? updated : r)));
-        showToast("success", "Conciliación realizada.");
+        if (updated.status === "capture_pending") showToast("info", "PayPal capture is still pending.");
+        else if (updated.status === "alert") showToast("error", "The captured amount or currency differs.");
+        else showToast("success", "Conciliación realizada.");
       }
     } catch (e: any) {
       showToast("error", e.message);
@@ -292,13 +293,9 @@ export const App: React.FC = () => {
               ...r,
               status: "alert",
               demo: { simulated: true, charged: overcharged },
-              paypal: {
-                ...r.paypal,
-                charged: overcharged,
-              },
               reconciliation: {
                 match: false,
-                detail: `SIMULATED OVERCHARGE: PayPal cobró $${overcharged.toFixed(2)} USD pero el precio autorizado era $${r.proposal.price.toFixed(2)} USD (Exceso: +$${(overcharged - r.proposal.price).toFixed(2)}).`,
+                detail: `SIMULATED OVERCHARGE: The simulated charge is $${overcharged.toFixed(2)} USD pero el precio autorizado era $${r.proposal.price.toFixed(2)} USD (Exceso: +$${(overcharged - r.proposal.price).toFixed(2)}).`,
                 source: "simulated",
               },
               updatedAt: new Date().toISOString(),
@@ -319,6 +316,11 @@ export const App: React.FC = () => {
   };
 
   const handleRefund = async (id: string) => {
+    const record = records.find((row) => row.proposal.id === id);
+    if (!record) return;
+    if (record.status !== "refund_pending" && !window.confirm(
+      `Refund the full captured amount (${record.paypal?.charged?.toFixed(2) ?? "unknown"} ${record.paypal?.chargedCurrency ?? record.proposal.currency})?`,
+    )) return;
     setLoading(true);
     try {
       if (isMockMode) {
@@ -346,7 +348,9 @@ export const App: React.FC = () => {
       } else {
         const updated = await api.refund(id, demoKey);
         setRecords((prev) => prev.map((r) => (r.proposal.id === id ? updated : r)));
-        showToast("success", "Reembolso procesado en el servidor.");
+        if (updated.status === "refund_pending") showToast("info", "PayPal refund is pending.");
+        else if (updated.status === "refunded") showToast("success", "PayPal refund completed.");
+        else showToast("error", "PayPal refund needs review.");
       }
     } catch (e: any) {
       showToast("error", e.message);
@@ -464,7 +468,7 @@ export const App: React.FC = () => {
   const handleSubmitNewProposal = async (proposalData: Omit<Proposal, "id">) => {
     setLoading(true);
     try {
-      if (isMockMode) {
+      if (isMockMode && activeMandate) {
         const id = `prop-${Math.floor(1000 + Math.random() * 9000)}`;
         const mandate = activeMandate;
         const perCapOk = proposalData.price <= mandate.maxPerPurchase;
@@ -533,7 +537,7 @@ export const App: React.FC = () => {
       {/* Navbar with brand identity & toggles */}
       <Navbar
         isMockMode={isMockMode}
-        setIsMockMode={setIsMockMode}
+        setIsMockMode={changeMode}
         systemHealth={systemHealth}
         demoKey={demoKey}
         onOpenSettings={() => setIsSettingsOpen(true)}
@@ -563,7 +567,9 @@ export const App: React.FC = () => {
         <AuditGrid
           records={records}
           onSelectRecord={setSelectedRecord}
-          onOpenNewProposal={() => setIsNewProposalOpen(true)}
+          onOpenNewProposal={() => activeMandate
+            ? setIsNewProposalOpen(true)
+            : showToast("info", "Create a mandate before submitting a proposal.")}
           onConfirmHuman={handleConfirmHuman}
           onPayWithPayPal={handlePayWithPayPal}
           onAuthorize={handleAuthorize}
@@ -623,6 +629,7 @@ export const App: React.FC = () => {
             isOpen={isNewProposalOpen}
             onClose={() => setIsNewProposalOpen(false)}
             activeMandate={activeMandate}
+            isMockMode={isMockMode}
             onSubmit={handleSubmitNewProposal}
           />
         )}

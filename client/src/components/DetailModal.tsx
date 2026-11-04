@@ -371,15 +371,16 @@ export const DetailModal: React.FC<DetailModalProps> = ({
               </button>
             )}
 
-            {status === "awaiting_paypal" && (
+            {status === "awaiting_paypal" && paypal?.orderId && (
               <button
                 onClick={() => {
-                  onCapture(proposal.id);
+                  const advance = paypal.intent === "AUTHORIZE" ? onAuthorize : onCapture;
+                  advance(proposal.id);
                   onClose();
                 }}
                 className="px-4 py-2 rounded-xl bg-paypal-vibrant hover:bg-paypal-blue text-white font-bold text-xs shadow-sm transition-all"
               >
-                Capturar Orden
+                {paypal.intent === "AUTHORIZE" ? "Verify & authorize" : "Capture order"}
               </button>
             )}
 
@@ -406,18 +407,18 @@ export const DetailModal: React.FC<DetailModalProps> = ({
               </>
             )}
 
-            {status === "captured" && (
+            {["captured", "capture_pending", "reconciled"].includes(status) && (
               <>
-                <button
+                {status !== "reconciled" && <button
                   onClick={() => {
                     onReconcile(proposal.id);
                     onClose();
                   }}
                   className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all"
                 >
-                  Reconciliar Captura
-                </button>
-                <button
+                  {status === "capture_pending" ? "Check capture" : "Reconciliar Captura"}
+                </button>}
+                {status !== "capture_pending" && <button
                   onClick={() => {
                     onDemoOvercharge(proposal.id);
                     onClose();
@@ -425,11 +426,11 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   className="px-4 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs transition-all"
                 >
                   Simular Sobrecargo
-                </button>
+                </button>}
               </>
             )}
 
-            {status === "alert" && (
+            {((status === "alert" && paypal?.captureStatus === "COMPLETED") || status === "refund_pending") && (
               <button
                 onClick={() => {
                   onRefund(proposal.id);
@@ -438,7 +439,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1.5"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Emitir Reembolso Completo</span>
+                <span>{status === "refund_pending" ? "Check refund" : "Emitir Reembolso Completo"}</span>
               </button>
             )}
 

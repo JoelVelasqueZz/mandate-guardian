@@ -23,6 +23,12 @@ export const api = {
     return res.json();
   },
 
+  async getMandates(): Promise<Mandate[]> {
+    const res = await fetch("/api/mandates");
+    if (!res.ok) throw new Error("Could not load mandates.");
+    return res.json();
+  },
+
   async createMandate(data: Omit<Mandate, "id">): Promise<Mandate> {
     const res = await fetch("/api/mandates", {
       method: "POST",
@@ -71,10 +77,10 @@ export const api = {
     return data;
   },
 
-  async confirmHuman(id: string): Promise<AuditRecord> {
+  async confirmHuman(id: string, demoKey: string): Promise<AuditRecord> {
     const res = await fetch(`/api/proposals/${id}/confirm`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getHeaders(demoKey),
       body: JSON.stringify({}),
     });
     const data = await res.json();
@@ -93,7 +99,7 @@ export const api = {
     return data;
   },
 
-  async getPayPalOrder(id: string, demoKey: string): Promise<{ record: AuditRecord; order: any }> {
+  async getPayPalOrder(id: string, demoKey: string): Promise<{ record: AuditRecord; order: { id: string; status: string; intent: "AUTHORIZE" | "CAPTURE" } }> {
     const res = await fetch(`/api/proposals/${id}/paypal`, {
       headers: getHeaders(demoKey),
     });

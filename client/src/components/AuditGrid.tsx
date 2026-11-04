@@ -86,7 +86,7 @@ export const AuditGrid: React.FC<AuditGridProps> = ({
   // Filtered rows for tabs
   const filteredData = useMemo(() => {
     if (statusFilter === "action") {
-      return records.filter((r) => ["awaiting_human", "awaiting_paypal", "capture_pending"].includes(r.status));
+      return records.filter((r) => ["awaiting_human", "awaiting_paypal", "capture_pending", "refund_pending"].includes(r.status));
     }
     if (statusFilter === "paid") {
       return records.filter((r) => ["approved", "authorized", "captured", "reconciled"].includes(r.status));
@@ -373,17 +373,31 @@ export const AuditGrid: React.FC<AuditGridProps> = ({
               )}
 
               {s === "awaiting_paypal" && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCapture(record.proposal.id);
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-paypal-vibrant hover:bg-paypal-blue text-white font-bold text-[11px] shadow-sm transition-all"
-                  title="Capturar orden aprobada en PayPal"
-                  aria-label={`Capturar orden PayPal para ${record.proposal.title}`}
-                >
-                  Capturar
-                </button>
+                <>
+                  {!isMockMode && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPayWithPayPal(record.proposal.id);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-paypal-gold text-slate-950 font-bold text-[11px]"
+                    >
+                      Open checkout
+                    </button>
+                  )}
+                  {record.paypal?.orderId && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const advance = record.paypal?.intent === "AUTHORIZE" ? onAuthorize : onCapture;
+                        advance(record.proposal.id);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-paypal-vibrant hover:bg-paypal-blue text-white font-bold text-[11px] shadow-sm transition-all"
+                    >
+                      {record.paypal.intent === "AUTHORIZE" ? "Verify & authorize" : "Capture order"}
+                    </button>
+                  )}
+                </>
               )}
 
               {s === "authorized" && (
@@ -413,9 +427,9 @@ export const AuditGrid: React.FC<AuditGridProps> = ({
                 </>
               )}
 
-              {s === "captured" && (
+              {["captured", "capture_pending", "reconciled"].includes(s) && (
                 <>
-                  <button
+                  {s !== "reconciled" && <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onReconcile(record.proposal.id);
@@ -424,9 +438,9 @@ export const AuditGrid: React.FC<AuditGridProps> = ({
                     title="Conciliar monto capturado en PayPal vs propuesta"
                     aria-label={`Conciliar captura de ${record.proposal.title}`}
                   >
-                    Conciliar
-                  </button>
-                  <button
+                    {s === "capture_pending" ? "Check capture" : "Conciliar"}
+                  </button>}
+                  {s !== "capture_pending" && <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onDemoOvercharge(record.proposal.id);
@@ -436,11 +450,11 @@ export const AuditGrid: React.FC<AuditGridProps> = ({
                     aria-label={`Simular sobrecargo en ${record.proposal.title}`}
                   >
                     Simular +$
-                  </button>
+                  </button>}
                 </>
               )}
 
-              {s === "alert" && (
+              {((s === "alert" && record.paypal?.captureStatus === "COMPLETED") || s === "refund_pending") && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -451,7 +465,7 @@ export const AuditGrid: React.FC<AuditGridProps> = ({
                   aria-label={`Emitir reembolso completo para ${record.proposal.title}`}
                 >
                   <RotateCcw className="w-3 h-3" />
-                  <span>Reembolsar</span>
+                  <span>{s === "refund_pending" ? "Check refund" : "Reembolsar"}</span>
                 </button>
               )}
 
@@ -472,7 +486,7 @@ export const AuditGrid: React.FC<AuditGridProps> = ({
         },
       },
     ];
-  }, [copiedId, onConfirmHuman, onPayWithPayPal, onCapture, onVoid, onReconcile, onDemoOvercharge, onRefund, onSelectRecord]);
+  }, [copiedId, onConfirmHuman, onPayWithPayPal, onAuthorize, onCapture, onVoid, onReconcile, onDemoOvercharge, onRefund, onSelectRecord, isMockMode]);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 shadow-soft overflow-hidden flex flex-col">
@@ -499,7 +513,7 @@ export const AuditGrid: React.FC<AuditGridProps> = ({
             }`}
           >
             Requiere Acción (
-            {records.filter((r) => ["awaiting_human", "awaiting_paypal"].includes(r.status)).length}
+            {records.filter((r) => ["awaiting_human", "awaiting_paypal", "capture_pending", "refund_pending"].includes(r.status)).length}
             )
           </button>
           <button

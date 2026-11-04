@@ -6,6 +6,7 @@ interface NewProposalModalProps {
   isOpen: boolean;
   onClose: () => void;
   activeMandate?: Mandate;
+  isMockMode: boolean;
   onSubmit: (proposal: Omit<Proposal, "id">) => Promise<void>;
 }
 
@@ -13,9 +14,11 @@ export const NewProposalModal: React.FC<NewProposalModalProps> = ({
   isOpen,
   onClose,
   activeMandate,
+  isMockMode,
   onSubmit,
 }) => {
   const [title, setTitle] = useState("Teclado Mecánico Ergonómico Bluetooth");
+  const [productId, setProductId] = useState("");
   const [price, setPrice] = useState<number>(45.0);
   const [category, setCategory] = useState("Electronics");
   const [seller, setSeller] = useState("keychron-partner.channel3.shop");
@@ -32,12 +35,12 @@ export const NewProposalModal: React.FC<NewProposalModalProps> = ({
       await onSubmit({
         mandateId: activeMandate.id,
         title,
+        productId: productId.trim() || undefined,
         price: Number(price),
         currency: "USD",
         category,
         seller,
         reasoning,
-        url: "https://trychannel3.com/products/demo-item",
       });
       onClose();
     } finally {
@@ -81,6 +84,17 @@ export const NewProposalModal: React.FC<NewProposalModalProps> = ({
             />
           </div>
 
+          {!isMockMode && (
+            <label className="block text-xs font-bold text-slate-700">
+              Catalog product ID
+              <input
+                required
+                value={productId}
+                onChange={(e) => setProductId(e.target.value)}
+                className="mt-1 w-full text-xs rounded-xl border border-slate-300 px-3 py-2.5"
+              />
+            </label>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">

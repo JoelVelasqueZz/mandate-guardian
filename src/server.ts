@@ -14,7 +14,6 @@ import { runMandate } from "./mandate/agent.js";
 import { parseMandateText } from "./mandate/parse-mandate.js";
 import { Store } from "./store.js";
 import { createPayPalRouter } from "./paypal/routes.js";
-import { seedDemoData } from "./seed.js";
 
 const app = express();
 app.use(compression());
@@ -29,9 +28,6 @@ app.use((_req, res, next) => {
   next();
 });
 const store = new Store();
-if (process.env.NODE_ENV !== "test") {
-  seedDemoData(store);
-}
 const aiReviewer = aiReviewerFromEnv(); // undefined unless AI_API_KEY and AI_MODEL are set
 const llm = llmFromEnv(); // same model, used by the buyer agent
 const catalog: Catalog = catalogFromEnv(); // live Channel3 with CHANNEL3_API_KEY, labeled demo data otherwise
@@ -54,6 +50,8 @@ app.post("/api/mandates", (req, res) => {
   store.mandates.set(parsed.data.id, parsed.data);
   res.status(201).json(parsed.data);
 });
+
+app.get("/api/mandates", (_req, res) => res.json([...store.mandates.values()]));
 
 /**
  * Guardian side of a proposal. The price is read from the catalog by productId; a listedPrice sent
@@ -100,21 +98,17 @@ app.post("/api/mandates/:id/shop", async (req, res) => {
   }
 });
 
-// 3. A human confirms a purchase that Guardian flagged.
-app.post("/api/proposals/:id/confirm", (req, res) => {
-  const record = store.records.get(req.params.id);
-  if (!record) return res.status(404).json({ error: "not found" });
-  if (record.status !== "awaiting_human") return res.status(409).json({ error: `status is ${record.status}` });
-  record.status = "approved";
-  store.upsert(record);
-  res.json(record);
-});
-
 // PayPal sandbox flows, callbacks and reconciliation.
 app.use(createPayPalRouter(store));
 
 // Feed for the AG Grid dashboard.
-app.get("/api/records", (_req, res) => res.json([...store.records.values()]));
+app.get("/api/records", (_req, res) => {
+  res.json([...store.records.values()].map((record) => {
+    if (!record.paypal) return record;
+    const { approveUrl: _approveUrl, returnState: _returnState, ...paypal } = record.paypal;
+    return { ...record, paypal };
+  }));
+});
 
 // Serve static frontend build and Agentic/SEO endpoints
 const clientDist = path.resolve(process.cwd(), "dist/client");

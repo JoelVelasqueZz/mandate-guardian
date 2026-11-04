@@ -121,6 +121,30 @@ describe("PayPal API flow (mock provider)", () => {
     expect((await api(endpoint("pay"))).status).toBe(409);
     expect(fake.createOrder).not.toHaveBeenCalled();
   });
+  it("requires the demo key for human confirmation and cannot confirm a block", async () => {
+    record.status = "awaiting_human";
+    expect((await api(endpoint("confirm"), {}, "POST", false)).status).toBe(401);
+    expect((await api(endpoint("confirm"))).body.status).toBe("approved");
+    record.status = "blocked";
+    expect((await api(endpoint("confirm"))).status).toBe(409);
+    expect(fake.createOrder).not.toHaveBeenCalled();
+  });
+  it("validates the app return and leaves all payment operations explicit", async () => {
+    await api(endpoint("pay"));
+    const urls = fake.createOrder.mock.calls[0][5];
+    const callback = new URL(urls.returnUrl);
+    callback.searchParams.set("token", "wrong-order");
+    expect((await fetch(origin + callback.pathname + callback.search)).status).toBe(400);
+    callback.searchParams.set("token", order.id);
+    const result = await fetch(origin + callback.pathname + callback.search);
+    expect(result.status).toBe(200);
+    expect(await result.text()).toContain('checkout=returned');
+    expect(record.status).toBe("awaiting_paypal");
+    expect(fake.authorizeOrder).not.toHaveBeenCalled();
+    expect(fake.captureAuthorization).not.toHaveBeenCalled();
+    const cancellation = await fetch(origin + "/paypal/cancel");
+    expect(await cancellation.text()).toContain('checkout=cancelled');
+  });
   it("creates one order and returns it on repeated pay", async () => {
     const first = await api(endpoint("pay"));
     const second = await api(endpoint("pay"));
@@ -194,6 +218,18 @@ describe("PayPal API flow (mock provider)", () => {
     expect((await api(endpoint("refund"), { confirm: true })).body.status).toBe("refunded");
     expect(fake.refundCapture).toHaveBeenCalledTimes(1);
     expect(fake.getRefund).toHaveBeenCalledTimes(1);
+  });
+  it("polls a pending capture and refuses to refund a failed capture", async () => {
+    await authorize();
+    capture.status = "PENDING";
+    expect((await api(endpoint("capture"))).status).toBe(202);
+    const pending = await api(endpoint("reconcile"));
+    expect(pending.status).toBe(202);
+    expect(pending.body.status).toBe("capture_pending");
+    capture.status = "DECLINED";
+    expect((await api(endpoint("reconcile"))).status).toBe(409);
+    expect((await api(endpoint("refund"), { confirm: true })).status).toBe(409);
+    expect(fake.refundCapture).not.toHaveBeenCalled();
   });
   it("reads reconciliation amounts from PayPal and rejects forged body amounts", async () => {
     await captured();

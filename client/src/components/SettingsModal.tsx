@@ -60,7 +60,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </p>
             <div className="relative">
               <input
-                type="text"
+                type="password"
+                autoComplete="off"
                 value={val}
                 onChange={(e) => setVal(e.target.value)}
                 placeholder="Ingresa tu DEMO_API_KEY..."
