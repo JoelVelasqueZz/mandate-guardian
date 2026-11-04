@@ -1,0 +1,14 @@
+# Mandate & Guardian
+
+> Trust Layer for AI Shopping Agents. The agent that spends is not the one that watches.
+
+Mandate & Guardian is an independent auditor and safety layer for autonomous AI purchasing agents, built for the PayPal AI Hackathon 2026.
+
+## Architecture and Core Endpoints
+
+- [System Health](/api/health): Runtime status of catalog and AI reviewer
+- [Audit Trail API](/api/records): Comprehensive audit records of all shopping proposals
+- [Mandate Rules Engine](/api/mandates): Policy definition for caps, categories, and human confirmation thresholds
+- [Documentation & Sandbox Guide](/docs/PAYPAL-TESTING.md): Sandbox verification and transaction flow
+- [Source Code](https://github.com/JoelVelasqueZz/mandate-guardian): Repository documentation and verification tests
+

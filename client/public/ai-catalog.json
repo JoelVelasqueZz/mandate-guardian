@@ -1,0 +1,23 @@
+{
+  "specVersion": "1.0",
+  "host": {
+    "displayName": "Mandate & Guardian",
+    "identifier": "http://localhost:3001"
+  },
+  "entries": [
+    {
+      "identifier": "urn:air:mandateguardian.local:agent:guardian-auditor",
+      "displayName": "Guardian Auditor Agent",
+      "type": "application/a2a-agent-card+json",
+      "description": "Deterministic safety rules engine auditing purchase proposals before payment execution",
+      "url": "http://localhost:3001/api/records"
+    },
+    {
+      "identifier": "urn:air:mandateguardian.local:agent:mandate-buyer",
+      "displayName": "Mandate Buyer Agent",
+      "type": "application/a2a-agent-card+json",
+      "description": "Catalog search and offer evaluation agent connecting to Channel3",
+      "url": "http://localhost:3001/api/mandates"
+    }
+  ]
+}

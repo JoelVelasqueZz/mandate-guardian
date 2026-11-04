@@ -1,5 +1,8 @@
 import "dotenv/config";
 import express from "express";
+import compression from "compression";
+import path from "node:path";
+import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import { MandateSchema, ProposalSchema, type AuditRecord, type Mandate, type Proposal } from "./types.js";
 import { review } from "./guardian/guardian.js";
@@ -10,10 +13,24 @@ import { runMandate } from "./mandate/agent.js";
 import { parseMandateText } from "./mandate/parse-mandate.js";
 import { Store } from "./store.js";
 import { createPayPalRouter } from "./paypal/routes.js";
+import { seedDemoData } from "./seed.js";
 
 const app = express();
+app.use(compression());
 app.use(express.json());
+
+// Security and Best Practices HTTP headers
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+});
 const store = new Store();
+if (process.env.NODE_ENV !== "test") {
+  seedDemoData(store);
+}
 const aiReviewer = aiReviewerFromEnv(); // undefined unless AI_API_KEY and AI_MODEL are set
 const llm = llmFromEnv(); // same model, used by the buyer agent
 const catalog: Catalog = catalogFromEnv(); // live Channel3 with CHANNEL3_API_KEY, labeled demo data otherwise
@@ -106,7 +123,80 @@ app.use(createPayPalRouter(store));
 // Feed for the AG Grid dashboard.
 app.get("/api/records", (_req, res) => res.json([...store.records.values()]));
 
+// Serve static frontend build and Agentic/SEO endpoints
+const clientDist = path.resolve(process.cwd(), "dist/client");
+
+app.get("/robots.txt", (_req, res) => {
+  res.type("text/plain").send("User-agent: *\nAllow: /\n");
+});
+
+app.get("/llms.txt", (_req, res) => {
+  const filePath = path.join(clientDist, "llms.txt");
+  if (fs.existsSync(filePath)) {
+    return res.type("text/markdown; charset=utf-8").sendFile(filePath);
+  }
+  res.type("text/markdown; charset=utf-8").send("# Mandate & Guardian\n\n> Trust Layer for AI Shopping Agents.\n\n- [API](/api/health): Health endpoint\n- [Records](/api/records): Audit records\n");
+});
+
+app.get(["/ai-catalog.json", "/.well-known/ai-catalog.json"], (_req, res) => {
+  const filePath = path.join(clientDist, "ai-catalog.json");
+  if (fs.existsSync(filePath)) {
+    return res.type("application/json").sendFile(filePath);
+  }
+  res.json({
+    specVersion: "1.0",
+    host: {
+      displayName: "Mandate & Guardian",
+      identifier: "http://localhost:3001",
+    },
+    entries: [
+      {
+        identifier: "urn:air:mandateguardian.local:agent:guardian-auditor",
+        displayName: "Guardian Auditor Agent",
+        type: "application/a2a-agent-card+json",
+        description: "Deterministic safety rules engine auditing purchase proposals before payment execution",
+        url: "http://localhost:3001/api/records",
+      },
+      {
+        identifier: "urn:air:mandateguardian.local:agent:mandate-buyer",
+        displayName: "Mandate Buyer Agent",
+        type: "application/a2a-agent-card+json",
+        description: "Catalog search and offer evaluation agent connecting to Channel3",
+        url: "http://localhost:3001/api/mandates",
+      },
+    ],
+  });
+});
+
+if (fs.existsSync(clientDist)) {
+  app.use(
+    express.static(clientDist, {
+      maxAge: "1d",
+      setHeaders: (res, filePath) => {
+        if (filePath.includes("assets")) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+      },
+    })
+  );
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api") || req.path.startsWith("/paypal")) return next();
+    res.sendFile(path.join(clientDist, "index.html"), (err) => {
+      if (err) next();
+    });
+  });
+}
+
 const port = Number(process.env.PORT ?? 3000);
-if (process.env.NODE_ENV !== "test") app.listen(port, "0.0.0.0", () => console.log(`Mandate & Guardian on http://localhost:${port}`));
+if (process.env.NODE_ENV !== "test") {
+  const server = app.listen(port, "0.0.0.0", () => console.log(`Mandate & Guardian on http://localhost:${port}`));
+  server.on("error", (err: any) => {
+    if (err.code === "EACCES") {
+      const fallbackPort = port === 3000 ? 3001 : port + 1;
+      console.warn(`Puerto ${port} restringido (EACCES), iniciando en http://localhost:${fallbackPort}...`);
+      app.listen(fallbackPort, "0.0.0.0", () => console.log(`Mandate & Guardian on http://localhost:${fallbackPort}`));
+    }
+  });
+}
 
 export { app, store };
