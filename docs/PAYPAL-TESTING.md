@@ -124,6 +124,35 @@ The `edison:paypal` CLI is available for isolated Sandbox operations. Its `repor
 command regenerates the results file from local state, so preserve the team decision
 and manual notes if you regenerate it.
 
+## Deploy and verify on Render
+
+Use the included `render.yaml` Blueprint for a new free Sandbox demo service. For an
+existing team Web Service, configure it on the delivery branch with build command
+`npm ci --include=dev && npm run build`, start command `npm start` and health check
+`/api/health`. The build creates both the Express server and the AG Grid dashboard.
+
+In the Render dashboard, set the Business Sandbox Client ID and Secret. Use
+`PAYPAL_PLAN=A`, `ENABLE_DEMO_SCENARIO=true` for the scripted demo, and a private
+`DEMO_API_KEY`. The Blueprint generates that key for a new service. Add the team's
+`CHANNEL3_API_KEY`, `AI_API_KEY` and `AI_MODEL` to exercise the live catalog and model.
+Render supplies the port and public origin. Leave `APP_BASE_URL` unset unless you
+need to override the origin with your custom HTTPS domain. Remove any existing
+localhost value from the deployed service.
+
+Open the deployed dashboard and `/api/health`. Use a new checkout to test the return
+to that deployed HTTPS origin. Verify buyer approval, authorization, capture and
+refund, and verify void on a separate authorization. You can also pass the service
+URL to `npm run verify:plan-a -- https://YOUR-SERVICE.onrender.com` using the service's
+demo key in your terminal environment.
+
+Keep the service on one instance during the demo. Its mandates, audit records and
+payment locks live in memory. A redeploy, restart or free-tier spin-down clears
+them. After a lost record, check PayPal for the existing transaction before creating
+a new one. Use only test data in the shared demo environment.
+
+[Render Express deployment](https://render.com/docs/deploy-node-express-app) ·
+[Blueprint reference](https://render.com/docs/blueprint-spec)
+
 ## Official PayPal references
 
 - [Sandbox accounts](https://developer.paypal.com/sandbox-testing/accounts)

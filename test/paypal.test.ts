@@ -145,6 +145,14 @@ describe("PayPal API flow (mock provider)", () => {
     const cancellation = await fetch(origin + "/paypal/cancel");
     expect(await cancellation.text()).toContain('checkout=cancelled');
   });
+  it("uses Render's public HTTPS origin when APP_BASE_URL is unset", async () => {
+    delete env.APP_BASE_URL;
+    env.RENDER_EXTERNAL_URL = "https://mandate-guardian-demo.onrender.com";
+    await api(endpoint("pay"));
+    const urls = fake.createOrder.mock.calls[0][5];
+    expect(new URL(urls.returnUrl).origin).toBe(env.RENDER_EXTERNAL_URL);
+    expect(urls.cancelUrl).toBe(env.RENDER_EXTERNAL_URL + "/paypal/cancel");
+  });
   it("creates one order and returns it on repeated pay", async () => {
     const first = await api(endpoint("pay"));
     const second = await api(endpoint("pay"));

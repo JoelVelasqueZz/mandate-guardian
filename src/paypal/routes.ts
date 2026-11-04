@@ -15,7 +15,9 @@ function requireFlow(condition: unknown, message: string, status = 409): asserts
   if (!condition) throw new FlowError(status, message);
 }
 function baseUrl(env: NodeJS.ProcessEnv) {
-  const url = new URL(env.APP_BASE_URL ?? "http://localhost:3000");
+  const origin = env.APP_BASE_URL || env.RENDER_EXTERNAL_URL || "http://localhost:3000";
+  requireFlow(URL.canParse(origin), "Set APP_BASE_URL to a valid app origin.", 503);
+  const url = new URL(origin);
   requireFlow(url.protocol === "https:" || (url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname)),
     "APP_BASE_URL must use HTTPS, or HTTP on localhost.", 503);
   return url.origin;
@@ -100,7 +102,7 @@ export function createPayPalRouter(store: Store, options: {
         return res.status(400).type("text").send("Invalid PayPal return. Check the order in the app.");
       }
     }
-    res.type("html").send("<!doctype html><html lang='en'><meta charset='utf-8'><title>PayPal Sandbox</title><h1>Return received</h1><p>Buyer approval still needs to be verified.</p><p><a href='/?checkout=returned'>Return to the dashboard</a></p></html>");
+    res.set("Cache-Control", "no-store").type("html").send("<!doctype html><html lang='en'><meta charset='utf-8'><title>PayPal Sandbox</title><h1>Return received</h1><p>Buyer approval still needs to be verified.</p><p><a href='/?checkout=returned'>Return to the dashboard</a></p></html>");
   });
   router.get("/paypal/cancel", (_req, res) => res.type("html").send(
     "<!doctype html><html lang='en'><meta charset='utf-8'><title>PayPal Sandbox</title><h1>Checkout cancelled</h1><p>You can reopen checkout from your proposal.</p><p><a href='/?checkout=cancelled'>Return to the dashboard</a></p></html>"));
@@ -118,13 +120,13 @@ export function createPayPalRouter(store: Store, options: {
     recheck(record);
     requireFlow(env.PAYPAL_PLAN === "A" || env.PAYPAL_PLAN === "B", "Set PAYPAL_PLAN to A or B after the sandbox decision.", 503);
     const intent = env.PAYPAL_PLAN === "A" ? "AUTHORIZE" : "CAPTURE";
+    const origin = baseUrl(env);
     // Store pending state BEFORE the network call. Retries reuse both URLs and request ID.
     record.paypal = { ...record.paypal, intent,
       returnState: record.paypal?.returnState ?? randomUUID() };
     record.status = "awaiting_paypal";
     store.upsert(record);
     const params = new URLSearchParams({ proposalId: record.proposal.id, state: record.paypal.returnState! });
-    const origin = baseUrl(env);
     const order = await client().createOrder(record.proposal.price, record.proposal.currency, record.proposal.title,
       intent, requestIdFor("create", record.proposal.id), {
         returnUrl: `${origin}/paypal/return?${params}`, cancelUrl: `${origin}/paypal/cancel`,

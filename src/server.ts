@@ -180,14 +180,7 @@ if (fs.existsSync(clientDist)) {
 
 const port = Number(process.env.PORT ?? 3000);
 if (process.env.NODE_ENV !== "test") {
-  const server = app.listen(port, "0.0.0.0", () => console.log(`Mandate & Guardian on http://localhost:${port}`));
-  server.on("error", (err: any) => {
-    if (err.code === "EACCES") {
-      const fallbackPort = port === 3000 ? 3001 : port + 1;
-      console.warn(`Puerto ${port} restringido (EACCES), iniciando en http://localhost:${fallbackPort}...`);
-      app.listen(fallbackPort, "0.0.0.0", () => console.log(`Mandate & Guardian on http://localhost:${fallbackPort}`));
-    }
-  });
+  app.listen(port, "0.0.0.0", () => console.log(`Mandate & Guardian listening on port ${port}`));
 }
 
 export { app, store };
