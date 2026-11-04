@@ -17,17 +17,16 @@ Plan A technical cycle: PASSED.
 
 Plan B independent capture/refund cycle: PASSED.
 
-## Human observations (fill after generating this report)
+## Team decision and observations
 
-- Buyer approval clicks / seconds: TODO
-- Return to app worked: TODO
-- VOIDED verified in API: TODO
-- Buyer hold release observed (time / balance): TODO
-- Search lag: see step 7; pending results are not payment failures.
-- Dispute: list permission alone does not prove create permission.
-- Chosen plan: Recommend Plan A for team review. Both plans passed in Sandbox. Plan A lets Guardian cancel an authorization before capture, while Plan B is the simpler option for direct capture after buyer approval.
+- **Plan A approved by the team on November 4, 2026.** The main flow authorizes the buyer-approved order before capture and can void a separate uncaptured authorization. Plan B remains the tested direct-capture fallback.
+- Buyer approval was verified through the direct CLI. Checkout timing and the integrated app return still need to be recorded from a new app-created order.
+- The separate authorization returned `VOIDED` from PayPal. The buyer's hold release time and balance change were not independently observed.
+- The buyer's Sandbox activity showed the USD 10.00 Plan A refund credited back to the PayPal balance.
+- Transaction Search returned 403 and the OAuth token lacked the required permission. Indexing delay could not be measured. The app reconciles through the capture lookup.
+- The buyer created a Sandbox dispute on a separate capture, and the seller API verified the relationship. This was a manual buyer action.
 
-Credential errors, buyer approval failures and refund failures affect both plans. Diagnose them before switching to B.
+These results were collected using the CLI against PayPal Sandbox. Integrated runs use new orders and are recorded separately.
 
 Raw resource responses are stored locally and ignored by git. Never publish credentials, OAuth tokens or buyer information.
 
