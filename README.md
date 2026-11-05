@@ -68,8 +68,15 @@ See the [PayPal Sandbox setup, demo run and Render instructions](docs/PAYPAL-TES
 |---|---|
 | Combined app | Automated tests exercise two complete Plan A rounds using mocked PayPal HTTP and the demo catalog. They verify approval, duplicate-order prevention, rejection of a blocked payment, capture, reconciliation, human-confirmed refund and separate void. |
 | PayPal Sandbox | Edison verified the direct CLI Plan A and B flows and a separate buyer dispute. Transaction Search returned HTTP 403. The app uses the capture lookup for reconciliation. See [Sandbox results](docs/SANDBOX-RESULTS.md). |
-| Channel3 and Gemini | The team verified each provider separately before integration. The combined flow with the real Sandbox buyer and live providers still needs a new run. |
-| Render | The Blueprint, compiled app and checkout origin logic are ready. Deployment and a checkout against the published URL need to be verified on the team's service. |
+| Channel3 and Gemini | The team verified each provider separately before integration. The Render checkout run used the demo catalog and deterministic Guardian rules. A full PayPal Sandbox run with live Channel3 and Gemini remains open. |
+| Render | Verified on November 4, 2026. The [public Render deployment](https://mandate-guardian-demo.onrender.com) completed two Plan A rounds against PayPal Sandbox. The buyer returned to the public HTTPS `/paypal/return` URL, and [`/api/health`](https://mandate-guardian-demo.onrender.com/api/health) reported `ok: true` and `paypalPlan: "A"`. |
+
+Both Render rounds recorded `completed: true`. The Guardian blocked a USD 55.00
+proposal because it exceeded the USD 40.00 cap and differed from the catalog price.
+Each USD 24.00 capture matched the approved amount. A simulated USD 32.50 charge
+triggered an alert, the refund of the original capture completed, and a separate
+authorization was voided before capture. Retries reused the same order IDs.
+The JSON evidence for run `ef0f89a6` is stored locally under `.local/edison-paypal/api/`.
 
 The demo is single-user. Durable storage, individual authentication, webhooks and
 automatic dispute submission are outside its current scope.
