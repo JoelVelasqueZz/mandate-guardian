@@ -57,3 +57,7 @@ Observations
 - In run 2 the Gemini reviewer escalated an otherwise valid proposal to a human because the Channel3 buy link goes through `buy.trychannel3.com`. It is a false positive, kept as a known issue (see the README). A human confirmation with the demo key moved the proposal on.
 - Real Transaction Search is still unavailable (HTTP 403), so reconciliation uses the capture lookup.
 - Only the Sandbox was used. The Render deployment was not part of this run.
+
+## Live run with the signed-receipt gate (November 5, 2026, local)
+
+Branch `feat/trust-layer`, live Channel3 and Gemini, PayPal Sandbox with a separate Personal buyer. The agent proposed a USD 36.00 item, the Guardian approved it on its own (the reviewer no longer flagged the Channel3 redirect link) and signed a receipt. `/pay` accepted the receipt and created the order; the buyer approved in PayPal Sandbox and returned to `/paypal/return`; verify and authorize, capture (`COMPLETED`, USD 36.00) and reconcile (`Charged 36 matches approved 36`, source `paypal_capture`) all worked from the dashboard. The hash-chained log held five events (reviewed, awaiting_paypal, authorized, captured, reconciled) and verified as intact, and the receipt signature verified from the "Receipt and trail" tab. The evidence download button was not clicked in this run; the evidence route is covered by the automated tests.
