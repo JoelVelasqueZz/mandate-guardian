@@ -72,7 +72,8 @@ See the [PayPal Sandbox setup, demo run and Render instructions](docs/PAYPAL-TES
 |---|---|
 | Combined app | Automated tests exercise two complete Plan A rounds using mocked PayPal HTTP and the demo catalog. They verify approval, duplicate-order prevention, rejection of a blocked payment, capture, reconciliation, human-confirmed refund and separate void. |
 | PayPal Sandbox | Edison verified the direct CLI Plan A and B flows and a separate buyer dispute. Transaction Search returned HTTP 403. The app uses the capture lookup for reconciliation. See [Sandbox results](docs/SANDBOX-RESULTS.md). |
-| Channel3 and Gemini | The team verified each provider separately before integration. The Render checkout run used the demo catalog and deterministic Guardian rules. A full PayPal Sandbox run with live Channel3 and Gemini remains open. |
+| Channel3 and Gemini | Verified separately before integration, then together with PayPal Sandbox in the local dashboard run of November 4 (see below). The Render checkout run used the demo catalog and deterministic Guardian rules. |
+| Local integrated run | November 4, 2026, one machine, live Channel3, Gemini and PayPal Sandbox, driven from the dashboard: order, buyer approval, authorize, capture, reconcile, human confirmation, simulated overcharge, full refund, and a voided authorization. Voiding released the buyer's hold: the Sandbox available balance rose by the voided amount. Details in [Sandbox results](docs/SANDBOX-RESULTS.md). |
 | Render | Verified on November 4, 2026. The [public Render deployment](https://mandate-guardian-demo.onrender.com) completed two Plan A rounds against PayPal Sandbox. The buyer returned to the public HTTPS `/paypal/return` URL, and [`/api/health`](https://mandate-guardian-demo.onrender.com/api/health) reported `ok: true` and `paypalPlan: "A"`. |
 
 Both Render rounds recorded `completed: true`. The Guardian blocked a USD 55.00
@@ -81,6 +82,10 @@ Each USD 24.00 capture matched the approved amount. A simulated USD 32.50 charge
 triggered an alert, the refund of the original capture completed, and a separate
 authorization was voided before capture. Retries reused the same order IDs.
 The JSON evidence for run `ef0f89a6` is stored locally under `.local/edison-paypal/api/`.
+
+Known issues: the Gemini reviewer can flag a valid Channel3 product as suspicious because its buy link
+goes through `buy.trychannel3.com`; it only makes the verdict stricter, so the proposal waits for a human.
+The dashboard's "Guardian verdict" column keeps the original verdict after a human approves.
 
 The demo is single-user. Durable storage, individual authentication, webhooks and
 automatic dispute submission are outside its current scope.
