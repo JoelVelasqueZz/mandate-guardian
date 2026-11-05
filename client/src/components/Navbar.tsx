@@ -102,6 +102,21 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right side controls */}
         <div className="flex items-center gap-3">
+          {/* Narrow windows hide the status badges, so the key needs its own always-visible button. */}
+          <button
+            onClick={onOpenSettings}
+            aria-label={demoKey ? "Demo key is set. Open its settings" : "Demo key is not set. Open its settings"}
+            title="Demo key for payment actions"
+            className={`xl:hidden flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${
+              demoKey
+                ? "bg-emerald-100 border-emerald-300 text-emerald-950 hover:bg-emerald-200"
+                : "bg-amber-100 border-amber-300 text-amber-950 hover:bg-amber-200"
+            }`}
+          >
+            <Key className="w-4 h-4" aria-hidden="true" />
+            <span>{demoKey ? "Key set" : "Set key"}</span>
+          </button>
+
           <button
             onClick={onOpenRedTeam}
             aria-label="Run the red team: hostile proposals against the Guardian"
