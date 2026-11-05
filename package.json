@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "smoke:paypal": "node --import tsx scripts/paypal-smoke.ts",
+    "gen:signing-key": "node scripts/gen-signing-key.mjs",
     "smoke:ai": "tsx scripts/ai-reviewer-smoke.ts",
     "smoke:channel3": "tsx scripts/channel3-smoke.ts",
     "edison:paypal": "node --import tsx scripts/edison-paypal.ts",
