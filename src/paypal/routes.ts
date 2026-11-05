@@ -22,16 +22,9 @@ function baseUrl(env: NodeJS.ProcessEnv) {
     "APP_BASE_URL must use HTTPS, or HTTP on localhost.", 503);
   return url.origin;
 }
-export function createPayPalRouter(store: Store, options: {
-  env?: NodeJS.ProcessEnv;
-  client?: PayPalClient;
-} = {}) {
-  const env = options.env ?? process.env;
-  let cached = options.client;
-  const client = () => cached ??= paypalFromEnv(env);
-  const router = Router();
-  const busy = new Set<string>();
-  function gate(req: Request, res: Response, next: NextFunction) {
+/** Requires `Authorization: Bearer <DEMO_API_KEY>`. Answers 503 when the server has no key set. */
+export function demoKeyGate(env: NodeJS.ProcessEnv) {
+  return function gate(req: Request, res: Response, next: NextFunction) {
     if (!env.DEMO_API_KEY) return res.status(503).json({ error: "Set DEMO_API_KEY on the server before testing payments." });
     const supplied = Buffer.from(req.header("Authorization")?.replace(/^Bearer /, "") ?? "");
     const expected = Buffer.from(env.DEMO_API_KEY);
@@ -39,7 +32,23 @@ export function createPayPalRouter(store: Store, options: {
       return res.status(401).json({ error: "Demo access key required." });
     }
     next();
-  }
+  };
+}
+
+export function createPayPalRouter(store: Store, options: {
+  env?: NodeJS.ProcessEnv;
+  client?: PayPalClient;
+  /** Returns the reason a proposal may not be paid (for example a missing Guardian receipt), or undefined. */
+  verifyApproval?: (record: AuditRecord) => string | undefined;
+  /** Called when a human confirms a proposal, before it becomes approved (the server issues the receipt here). */
+  onHumanConfirm?: (record: AuditRecord) => void;
+} = {}) {
+  const env = options.env ?? process.env;
+  let cached = options.client;
+  const client = () => cached ??= paypalFromEnv(env);
+  const router = Router();
+  const busy = new Set<string>();
+  const gate = demoKeyGate(env);
   function sendError(res: Response, e: unknown) {
     if (e instanceof FlowError) return res.status(e.status).json({ error: e.message });
     if (e instanceof PayPalError) return res.status(502).json({
@@ -110,6 +119,7 @@ export function createPayPalRouter(store: Store, options: {
   router.post("/api/proposals/:id/confirm", gate, withRecord(async (_req, res, record) => {
     requireFlow(record.status === "awaiting_human", `Cannot confirm a proposal in status ${record.status}.`);
     record.status = "approved";
+    options.onHumanConfirm?.(record);
     store.upsert(record);
     res.json(record);
   }));
@@ -117,6 +127,9 @@ export function createPayPalRouter(store: Store, options: {
   router.post("/api/proposals/:id/pay", gate, withRecord(async (_req, res, record) => {
     requireFlow(["approved", "awaiting_paypal"].includes(record.status), `Cannot pay a proposal in status ${record.status}.`);
     if (record.paypal?.orderId) return res.json({ record, approveUrl: record.paypal.approveUrl });
+    // No Guardian receipt, or a proposal edited after approval, means no PayPal order.
+    const unapproved = options.verifyApproval?.(record);
+    requireFlow(!unapproved, unapproved ?? "", 403);
     recheck(record);
     requireFlow(env.PAYPAL_PLAN === "A" || env.PAYPAL_PLAN === "B", "Set PAYPAL_PLAN to A or B after the sandbox decision.", 503);
     const intent = env.PAYPAL_PLAN === "A" ? "AUTHORIZE" : "CAPTURE";
