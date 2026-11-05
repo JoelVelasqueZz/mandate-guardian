@@ -1,4 +1,4 @@
-import { AuditRecord, Mandate, SystemHealth } from "./types";
+import { AuditEvent, AuditRecord, ChainCheck, Mandate, RedTeamReport, SystemHealth } from "./types";
 
 const authHeaders = (demoKey?: string) => {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -29,6 +29,25 @@ export const api = {
   getHealth: () => request<SystemHealth>("/api/health", "Could not reach the server."),
 
   getMandates: () => request<Mandate[]>("/api/mandates", "Could not load the mandates."),
+
+  getAuditLog: () =>
+    request<ChainCheck & { events: AuditEvent[] }>("/api/audit-log", "Could not load the audit log."),
+
+  runRedTeam: (useAi: boolean) =>
+    request<RedTeamReport>("/api/redteam/run", "Could not run the red team.", post({ useAi })),
+
+  verifyReceipt: (receipt: unknown) =>
+    request<{ valid: boolean; keyId: string }>("/api/receipts/verify", "Could not verify the receipt.", post({ receipt })),
+
+  /** The evidence packet as Markdown. It needs the demo key because it lists PayPal IDs. */
+  async downloadEvidence(id: string, demoKey: string): Promise<string> {
+    const res = await fetch(`/api/proposals/${id}/evidence?format=md`, { headers: authHeaders(demoKey) });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(typeof data?.error === "string" ? data.error : "Could not build the evidence packet.");
+    }
+    return res.text();
+  },
 
   getRecords: () => request<AuditRecord[]>("/api/records", "Could not load the audit records."),
 

@@ -52,6 +52,30 @@ then reconciles what was charged and recommends a refund when something doesn't 
   the catalog. A proposal with no `productId`, an unknown product, a currency mismatch or a catalog
   that cannot be reached is **blocked** (it fails closed). Unit and endpoint tests cover each case;
   against the demo catalog only, not repeated against live Channel3 after this change.
+- **Signed approval receipts** (`src/guardian/receipt.ts`): every approval is signed with Ed25519 (a
+  human confirmation produces a second receipt). `POST /api/proposals/:id/pay` refuses to create a
+  PayPal order without a valid receipt, and refuses a proposal whose price, product or mandate changed
+  after the approval. This enforces that the Guardian step happened and that the approved fields were
+  not edited; the key lives in the same server process, so it is not a separate trust domain. Set
+  `GUARDIAN_SIGNING_KEY` to keep receipts valid across restarts; without it a new key is generated at
+  start. Verify a receipt with `POST /api/receipts/verify` or the dashboard.
+- **Hash-chained audit log** (`src/audit/chain.ts`): every proposal review and every status change
+  (order, authorization, capture, void, reconciliation, refund) is appended with the hash of the
+  previous event. `GET /api/audit-log/verify` reports whether the chain is intact and where it breaks.
+  It detects tampering; it lives in memory like the rest of the store and is not durable.
+- **Red team** (`src/redteam.ts`, `POST /api/redteam/run`, the "Red team" button): 12 hostile scenarios
+  (over the cap, forged catalog price, self-reported price, unknown product, currency swap, wrong
+  category, late delivery, salami slicing across the monthly cap, two prompt injections, the
+  human-confirmation threshold, and a control that must be approved) go through the same Guardian code
+  the API uses, on an isolated store and an offline test catalog. Real records are never touched. With
+  an AI model configured, the two injection scenarios can also be shown to the reviewer. Covered by
+  tests, including a reviewer that tries to approve everything.
+- **Fix hints and evidence packet:** a failed rule says what would have to change for it to pass
+  (deterministic text, not from a model). `GET /api/proposals/:id/evidence?format=md` (demo key)
+  returns the decision, receipt, PayPal IDs, reconciliation and the hash-chained timeline for one
+  proposal. It supports a dispute; it does not file one.
+- **Rate limits:** per-IP limits on `/api/mandates/:id/shop`, `/api/mandates/parse`,
+  `/api/proposals` and `/api/redteam/run`.
 - **Natural-language mandates** (`src/mandate/parse-mandate.ts`, needs the AI model): turns a request
   such as "a gift for my mom, max $40, by Friday" into a mandate draft for the user to review. The
   model never invents a spending cap; missing caps come back as questions.
@@ -157,6 +181,12 @@ authentication; this is a single-user demo API.
 | POST | `/api/mandates/:id/shop` | none | Mandate searches the catalog and proposes; the Guardian reviews the proposal |
 | POST | `/api/proposals` | none | Submit a purchase proposal; the Guardian reviews it |
 | POST | `/api/proposals/:id/confirm` | demo key | A human confirms a proposal the Guardian flagged |
+| GET | `/api/guardian/public-key` | none | Public key that verifies the Guardian's receipts |
+| GET | `/api/proposals/:id/receipt` | none | The Guardian's signed receipt for an approved proposal |
+| POST | `/api/receipts/verify` | none | Check a receipt's signature |
+| GET | `/api/audit-log`, `/api/audit-log/verify` | none | Hash-chained events and the integrity check |
+| POST | `/api/redteam/run` | none | Run the hostile scenarios on an isolated copy of the Guardian |
+| GET | `/api/proposals/:id/evidence` | demo key | Evidence packet (`?format=md` for Markdown) |
 | GET | `/api/records` | none | Audit records with checkout URLs and return tokens omitted |
 | POST | `/api/proposals/:id/pay` | demo key | Create the PayPal Sandbox order for an approved proposal; returns the buyer approval link |
 | GET | `/api/proposals/:id/paypal` | demo key | Read the PayPal order, to check buyer approval |
@@ -173,6 +203,7 @@ Payment details and the request contract are in [docs/PAYPAL-TESTING.md](docs/PA
 
 ## Security notes
 
+- A proposal can only be paid with a valid Guardian receipt (see above). Anything edited after approval is refused.
 - PayPal **Sandbox** only. Never commit `.env`; it is git-ignored.
 - Spending caps live in deterministic code and are not delegated to a model.
 - Use only synthetic mandates and Sandbox data in the shared demo. The demo key gates

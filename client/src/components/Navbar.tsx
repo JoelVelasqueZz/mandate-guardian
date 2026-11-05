@@ -1,9 +1,11 @@
 import React from "react";
-import { ShieldCheck, ShoppingBag, Database, Key, RefreshCw, Sparkles } from "lucide-react";
-import { SystemHealth } from "../types";
+import { ShieldCheck, ShoppingBag, Database, Key, RefreshCw, Sparkles, Link2, Swords } from "lucide-react";
+import { ChainCheck, SystemHealth } from "../types";
 
 interface NavbarProps {
   systemHealth: SystemHealth | null;
+  chain: ChainCheck | null;
+  onOpenRedTeam: () => void;
   demoKey: string;
   onOpenSettings: () => void;
   onRefresh: () => void;
@@ -12,6 +14,8 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({
   systemHealth,
+  chain,
+  onOpenRedTeam,
   demoKey,
   onOpenSettings,
   onRefresh,
@@ -67,6 +71,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             </span>
           </div>
 
+          {/* Tamper-evident audit log */}
+          <div
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 border border-slate-300 text-slate-800"
+            title={chain ? `Head hash ${chain.headHash.slice(0, 16)}...` : "The audit log could not be read"}
+          >
+            <Link2 className="w-3.5 h-3.5 text-slate-600" aria-hidden="true" />
+            <span>Audit chain:</span>
+            <span className={`font-bold ${chain ? (chain.ok ? "text-emerald-800" : "text-rose-800") : "text-slate-700"}`}>
+              {chain ? (chain.ok ? `Verified (${chain.length})` : `Broken at #${chain.brokenAt}`) : "n/a"}
+            </span>
+          </div>
+
           {/* PayPal Demo Key Status */}
           <button
             onClick={onOpenSettings}
@@ -86,6 +102,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right side controls */}
         <div className="flex items-center gap-3">
+          <button
+            onClick={onOpenRedTeam}
+            aria-label="Run the red team: hostile proposals against the Guardian"
+            title="Try to fool the Guardian"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-300 transition-colors"
+          >
+            <Swords className="w-4 h-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Red team</span>
+          </button>
+
           {/* Refresh action */}
           <button
             onClick={onRefresh}
