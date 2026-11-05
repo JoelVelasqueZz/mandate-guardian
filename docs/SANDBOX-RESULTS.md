@@ -17,17 +17,16 @@ Plan A technical cycle: PASSED.
 
 Plan B independent capture/refund cycle: PASSED.
 
-## Human observations (fill after generating this report)
+## Team decision and observations
 
-- Buyer approval clicks / seconds: TODO
-- Return to app worked: TODO
-- VOIDED verified in API: TODO
-- Buyer hold release observed (time / balance): TODO
-- Search lag: see step 7; pending results are not payment failures.
-- Dispute: list permission alone does not prove create permission.
-- Chosen plan: Recommend Plan A for team review. Both plans passed in Sandbox. Plan A lets Guardian cancel an authorization before capture, while Plan B is the simpler option for direct capture after buyer approval.
+- **Plan A approved by the team on November 4, 2026.** The main flow authorizes the buyer-approved order before capture and can void a separate uncaptured authorization. Plan B remains the tested direct-capture fallback.
+- Buyer approval was first verified through the direct CLI. The integrated dashboard checkout was run on November 4 (see "Integrated dashboard run" below): the buyer signs in and approves in PayPal, then PayPal redirects back to `/paypal/return`.
+- The separate authorization returned `VOIDED` from PayPal. In the November 4 dashboard run the buyer's available Sandbox balance rose by the voided amount (see below). The release time was not measured.
+- The buyer's Sandbox activity showed the USD 10.00 Plan A refund credited back to the PayPal balance.
+- Transaction Search returned 403 and the OAuth token lacked the required permission. Indexing delay could not be measured. The app reconciles through the capture lookup.
+- The buyer created a Sandbox dispute on a separate capture, and the seller API verified the relationship. This was a manual buyer action.
 
-Credential errors, buyer approval failures and refund failures affect both plans. Diagnose them before switching to B.
+These results were collected using the CLI against PayPal Sandbox. Integrated runs use new orders and are recorded separately.
 
 Raw resource responses are stored locally and ignored by git. Never publish credentials, OAuth tokens or buyer information.
 
@@ -38,3 +37,23 @@ Raw resource responses are stored locally and ignored by git. Never publish cred
 | Create and approve CAPTURE order | APPROVED  | 9XA32704J1984382L |
 | Direct capture of USD 10.00      | COMPLETED | 7CS6236864427384V |
 | Full refund of USD 10.00         | COMPLETED | 9KV20932YR276124U |
+
+## Integrated dashboard run (November 4, 2026, local)
+
+Run by Joel on one machine with the integrated code (`integration/final`): live Channel3 search and
+price re-read, the Gemini model for the buyer agent and the Guardian reviewer, PayPal Sandbox with a
+separate Personal buyer account, Plan A, driven from the dashboard. The records live in the server's
+memory only; no raw evidence files were saved to git.
+
+| # | Flow | Result |
+|---|---|---|
+| 1 | Mandate searches Channel3 (USD 17.99 item), Guardian approves with `price_verified` and `price_matches_listing`, checkout in the same tab, buyer approves, return to the dashboard, verify and authorize, capture, reconcile | Captured USD 17.99 (`COMPLETED`), reconciliation matched the approved amount using the PayPal capture lookup |
+| 2 | Same product, human confirmation with the demo key, pay, authorize, capture, labeled simulated overcharge (USD 26.49), full refund | Status `alert` with `source: simulated`, then refund `COMPLETED`. The buyer's activity showed the USD 17.99 refund credited back |
+| 3 | Same product, pay, authorize, then void (no capture) | Status `voided`. Buyer's available balance went from USD 4,964.02 to USD 4,982.01 (+17.99) and the pending authorization entry disappeared |
+
+Observations
+- The buyer signed in, chose the payment method ("Continue and review order") and approved. The exact number of PayPal screens was not recorded. PayPal then redirected to `/paypal/return` with the order token, `PayerID` and the app's `state`, and the app validated them.
+- The demo key survived the same-tab redirect (session storage).
+- In run 2 the Gemini reviewer escalated an otherwise valid proposal to a human because the Channel3 buy link goes through `buy.trychannel3.com`. It is a false positive, kept as a known issue (see the README). A human confirmation with the demo key moved the proposal on.
+- Real Transaction Search is still unavailable (HTTP 403), so reconciliation uses the capture lookup.
+- Only the Sandbox was used. The Render deployment was not part of this run.

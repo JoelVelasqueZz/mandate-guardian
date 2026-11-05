@@ -1,133 +1,160 @@
-# PayPal Sandbox testing and frontend handoff
+# PayPal Sandbox testing
 
-This integration is a sandbox-only hackathon prototype. It uses USD, one purchase unit,
-one final capture and one full refund. No real-money or live PayPal endpoint is enabled.
-It does not place an order with a Channel3 retailer or implement shipping/fulfilment.
+The team chose **Plan A**. Guardian reviews the proposal before the backend opens checkout.
+The Personal Sandbox buyer approves the PayPal order, then the app authorizes it and
+either captures or voids the authorization. The demo uses USD, one purchase unit, one
+final capture and one full refund. A Channel3 listing is used for product validation.
 
-## Run locally
+## Configure and run locally
 
-Use Node.js 22 or newer. Run `npm ci`, copy `.env.example` to `.env` and set the
-PayPal sandbox app credentials, `APP_BASE_URL`, `PAYPAL_PLAN` and a random `DEMO_API_KEY`.
-Then run `npm test`, `npm run typecheck`, `npm run build` and `npm run dev`.
-This build uses `npm start` -> `node dist/src/server.js`.
+Use Node.js 22. In PowerShell, run these commands from the repository root.
 
-PayPal setup:
-
-1. Sign into https://developer.paypal.com/dashboard/ with your own developer account.
-2. Choose Sandbox and open Apps & Credentials. Create a Merchant app associated with
-   your Business sandbox seller. Copy the Client ID and Secret into the server `.env`.
-3. Open Testing Tools > Sandbox Accounts. Retrieve a separate Personal sandbox buyer's
-   login under View/Edit account. Its email/password are checkout credentials, not API keys.
-4. Start the local server. Run `npm run smoke:paypal`, open its approval URL and use the
-   Personal sandbox buyer. Never approve with the seller account or a live PayPal account.
-5. Follow the Spanish internal guide for the complete CLI test matrix. The CLI calls
-   PayPal directly; its orders do not create application audit records.
-
-## API contract for Jhon
-
-Payment API requests use `Authorization: Bearer <DEMO_API_KEY>`.
-This is a shared demo access key, not PayPal's OAuth token. Do not embed PayPal secrets
-or a permanent demo key in committed frontend files. The shared demo gate does not
-implement individual user authentication, permissions or production account isolation.
-The current mandates/records API remains the original in-memory demo API.
-
-| Method | Route | Request / result |
-|---|---|---|
-| POST | `/api/proposals/:id/pay` | Only approved proposals; returns `{record, approveUrl}` |
-| GET | `/api/proposals/:id/paypal` | Returns `{record, order}`; read `order.status` to verify buyer approval |
-| POST | `/api/proposals/:id/authorize` | Plan A, after buyer approval; returns the updated record |
-| POST | `/api/proposals/:id/capture` | Plan A captures authorization; Plan B captures the approved order |
-| POST | `/api/proposals/:id/void` | Cancels an uncaptured authorization; returns `voided` only after verification |
-| POST | `/api/proposals/:id/reconcile` | Empty body; reads PayPal capture, never trusts a caller-supplied charge |
-| POST | `/api/proposals/:id/refund` | Body `{"confirm":true}`; one full refund; poll the same route if pending |
-| POST | `/api/proposals/:id/demo-overcharge` | Body `{"charged":27.5}`; requires `ENABLE_DEMO_SCENARIO=true` |
-| GET | `/api/paypal/transactions` | Optional `start`, `end`, `transactionId`, `page`; date range <=31 days |
-| GET | `/paypal/return` | Return landing page; never captures automatically |
-| GET | `/paypal/cancel` | Cancel landing page; an existing authorization still needs an explicit void |
-
-Use existing `POST /api/proposals/:id/confirm` for Guardian human confirmation.
-That confirmation and PayPal buyer approval are two separate steps.
-New status values for AG Grid: `awaiting_paypal`, `capture_pending`, `refund_pending`.
-Keep all original status values, including `refunded` as the final refund state.
-Do not automatically display a refunded purchase as reconciled or successfully paid.
-
-Example frontend call (obtain the private demo key from a manual demo session):
-
-```ts
-const response = await fetch(`/api/proposals/${proposalId}/pay`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json", Authorization: `Bearer ${demoKey}` },
-  body: "{}",
-});
-const result = await response.json();
-if (!response.ok) throw new Error(result.error);
-window.location.assign(result.approveUrl);
+```powershell
+npm.cmd ci
+if (-not (Test-Path .\.env)) { Copy-Item .\.env.example .\.env }
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
 ```
 
-Serve frontend and API from the same origin for this MVP. The kit does not add a separate
-frontend server, a CORS policy, or frontend screens.
+In [PayPal Developer Dashboard](https://developer.paypal.com/dashboard/), select
+**Sandbox**, open **Apps & Credentials**, and create or open a Merchant app linked to a
+Business Sandbox seller. Add its Client ID and Secret to `.env`. Under **Testing Tools →
+Sandbox Accounts**, get the login for a separate Personal Sandbox buyer. Use that account
+in the PayPal checkout window.
 
-## Data contract for Joel
+Paste the generated value into `DEMO_API_KEY`. Set `PAYPAL_PLAN=A`,
+`APP_BASE_URL=http://localhost:3000` and `ENABLE_DEMO_SCENARIO=true`. Keep
+`PAYPAL_BASE_URL=https://api-m.sandbox.paypal.com`. For a deterministic first run, leave
+`CHANNEL3_API_KEY`, `AI_API_KEY` and `AI_MODEL` empty. The app reports that catalog as
+`demo`. Configure the team-owned provider keys and model when verifying the live catalog
+and reviewer.
 
-Each audit row keeps `paypal.orderId`, `authorizationId`, `captureId`, `refundId`,
-`intent`, `captureStatus`, `refundStatus`, `charged`, `chargedCurrency`, `capturedAt`.
-`charged` is the gross captured amount, not the seller's net proceeds after fees.
+```powershell
+npm.cmd test
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd start
+```
+
+The built app serves the dashboard and API from one origin at
+[localhost:3000](http://localhost:3000). The dashboard shows the server records only; it has no
+sample data. Enter the same `DEMO_API_KEY` in its settings for payment and confirmation actions. The
+browser retains it for the current tab through checkout.
+
+## Run two integrated Sandbox rounds
+
+Keep the server open. In a second PowerShell terminal, run:
+
+```powershell
+npm.cmd run verify:plan-a
+```
+
+The script runs the buyer agent and Guardian with a USD 40 cap per purchase. It uses
+the resulting catalog item for the approved, blocked and void cases. To specify a
+search phrase, pass the app URL and query, for example:
+
+```powershell
+npm.cmd run verify:plan-a -- http://localhost:3000 "ceramic mug gift"
+```
+
+For each round:
+
+1. If Guardian requests human confirmation, read the explanation and type `CONFIRM`
+   to approve it. A blocked proposal must return HTTP 409 when payment is attempted.
+2. Open the printed PayPal Sandbox link and approve as the Personal buyer. Confirm
+   that the return page loads, then type `APPROVED` in the terminal. The script checks
+   the remote order and verifies that retrying checkout reused the same order ID.
+3. The script authorizes, captures and reconciles using the capture lookup. It then
+   creates a clearly labeled overcharge simulation. Type `REFUND` after reviewing the
+   original amount to issue the full Sandbox refund.
+4. Approve the separate checkout printed for the void case. It is authorized and
+   voided before capture. Verify the resulting row in the dashboard.
+5. Save the two completed JSON files from `.local/edison-paypal/api/`. They include
+   each mandate, decision, payment IDs, actual amount, separate simulation, and final
+   audit rows. A partial run retains its last saved checkpoint. If a capture or refund
+   is pending, check the same proposal in the app and consult its PayPal status before
+   starting another run.
+
+To rehearse in the dashboard, create a mandate without a delivery date, use the
+shopping agent to find a mug, and pay an approved proposal in API Backend mode. After
+PayPal returns, click **Return to the dashboard**, **Verify & authorize**, then capture.
+From the capture, reconcile or simulate an overcharge. Review the refund prompt before
+sending the refund. On a separate order, select **Void** while the authorization is
+still uncaptured.
+
+## API contract
+
+`Authorization: Bearer <DEMO_API_KEY>` is required for human confirmation and payment
+API routes. Enter this key in the demo tab only. PayPal credentials stay on the server.
+
+| Method | Route | Request or result |
+|---|---|---|
+| GET | `/api/mandates` | Restores mandates in the dashboard after checkout |
+| GET | `/api/records` | Audit rows without checkout URLs or return state |
+| POST | `/api/proposals/:id/confirm` | Confirms an `awaiting_human` proposal |
+| POST | `/api/proposals/:id/pay` | Creates or reuses an approved checkout; returns `{record, approveUrl}` |
+| GET | `/api/proposals/:id/paypal` | Returns the record and order ID, intent and status |
+| POST | `/api/proposals/:id/authorize` | Authorizes a buyer-approved Plan A order |
+| POST | `/api/proposals/:id/capture` | Captures the authorization; HTTP 202 means pending |
+| POST | `/api/proposals/:id/void` | Cancels and verifies a separate uncaptured authorization |
+| POST | `/api/proposals/:id/reconcile` | Reads the amount and currency from the PayPal capture; HTTP 202 means pending |
+| POST | `/api/proposals/:id/demo-overcharge` | Body `{"charged":32.5}` for a USD 24 capture; requires the demo flag |
+| POST | `/api/proposals/:id/refund` | Body `{"confirm":true}`; polls the existing refund if pending |
+| GET | `/api/paypal/transactions` | Optional `start`, `end`, `transactionId`, `page`; date range up to 31 days |
+| GET | `/paypal/return`, `/paypal/cancel` | Checkout landing pages with a dashboard link; payment operations are explicit |
+
+The rows for Joel and Jhon contain `paypal.orderId`, `authorizationId`, `captureId`,
+`refundId`, status fields, the gross captured `charged` and `chargedCurrency`.
 `reconciliation.source` distinguishes `paypal_capture` and `simulated`.
-Demo data lives in `demo: {simulated:true, charged:...}` and never replaces the real
-`paypal.charged`. A full refund returns only the actual captured amount.
+`demo.charged` holds the simulated amount. A full refund uses the actual capture.
+Keep `refunded` as the final status while preserving the simulation as audit history.
+The MVP verifies amount and currency. A Sandbox payment has no retail fulfilment.
 
-The existing AiReviewer hook is unchanged. Joel connects the team's chosen model.
-Hard spending rules stay deterministic, and the reviewer must never relax `block`.
-The kit rechecks those rules before payment and before an uncaptured charge is made.
-Approval reservations now count towards the monthly cap. Completed full refunds and
-voids release those reservations. Budget dates use capture/creation dates, not later
-reconciliation timestamps. Validate that budget policy with the team.
+## What has been verified
 
-This MVP compares amount and currency. Product identity and true duplicate-charge
-detection still require Joel/Cristopher's Channel3 and reconciliation work.
+- [Sandbox results](SANDBOX-RESULTS.md) records the original direct CLI tests, including
+  buyer approval, void, refund, the manual dispute and the team's choice of Plan A.
+- `npm test` runs the app through two complete Plan A rounds with PayPal HTTP mocked.
+  Only runs with the real Sandbox buyer provide new Sandbox payment evidence.
+- Transaction Search returned HTTP 403 with the team's Sandbox credentials. The
+  dashboard reconciles through the capture lookup. Buyer hold release remains a
+  separate manual observation from the API's `VOIDED` status.
 
-## Evidence and plan selection
+The `edison:paypal` CLI is available for isolated Sandbox operations. Its `report`
+command regenerates the results file from local state, so preserve the team decision
+and manual notes if you regenerate it.
 
-`npm run edison:paypal -- report` creates `docs/SANDBOX-RESULTS.md`.
-Responses and stable test identifiers stay in `.local/edison-paypal/`, ignored by git.
-Do not publish raw payer, address, credentials or OAuth data.
+## Deploy and verify on Render
 
-Choose Plan A only after create, buyer approval, authorize, capture, separate void and
-refund succeed, and the buyer interaction fits the demo. Verify hold release separately.
-Test Plan B's independent CAPTURE and refund cycle if authorization-specific operations
-fail. Wrong credentials or missing buyer approval are not solved by switching plans.
-`PAYPAL_PLAN=A` in the example is a development setting, not evidence that A has passed.
+Use the included `render.yaml` Blueprint for a new free Sandbox demo service. For an
+existing team Web Service, configure it on the delivery branch with build command
+`npm ci --include=dev && npm run build`, start command `npm start` and health check
+`/api/health`. The build creates both the Express server and the AG Grid dashboard.
 
-Transaction Search can lag by up to three hours. A missing row immediately after capture
-does not mean the capture failed. Capture data powers immediate reconciliation.
-An empty disputes list or a successful GET does not prove buyer dispute creation works.
-Use a separate, unrefunded transaction and the Personal sandbox Resolution Center.
-The sandbox dispute-create API requires buyer-side setup; the merchant's key alone is
-not a general buyer dispute-create capability.
+In the Render dashboard, set the Business Sandbox Client ID and Secret. Use
+`PAYPAL_PLAN=A`, `ENABLE_DEMO_SCENARIO=true` for the scripted demo, and a private
+`DEMO_API_KEY`. The Blueprint generates that key for a new service. Add the team's
+`CHANNEL3_API_KEY`, `AI_API_KEY` and `AI_MODEL` to exercise the live catalog and model.
+Render supplies the port and public origin. Leave `APP_BASE_URL` unset unless you
+need to override the origin with your custom HTTPS domain. Remove any existing
+localhost value from the deployed service.
 
-## Render
+Open the deployed dashboard and `/api/health`. Use a new checkout to test the return
+to that deployed HTTPS origin. Verify buyer approval, authorization, capture and
+refund, and verify void on a separate authorization. You can also pass the service
+URL to `npm run verify:plan-a -- https://YOUR-SERVICE.onrender.com` using the service's
+demo key in your terminal environment.
 
-Create/update the team's Node Web Service. Use build command
-`npm ci --include=dev && npm run build` and start command `npm start`.
-Set `NODE_VERSION=22`, the sandbox app credentials, `PAYPAL_PLAN`, `DEMO_API_KEY`,
-`APP_BASE_URL=https://YOUR-SERVICE.onrender.com` and the demo scenario flag.
-Let Render provide `PORT`. Never set APP_BASE_URL to the PayPal API host.
-After changing the base URL, create new orders so their return URLs use the new origin.
+Keep the service on one instance during the demo. Its mandates, audit records and
+payment locks live in memory. A redeploy, restart or free-tier spin-down clears
+them. After a lost record, check PayPal for the existing transaction before creating
+a new one. Use only test data in the shared demo environment.
 
-All application audit data, locks and tokens are held in one process. Keep the demo on
-one instance and do not restart between approval and capture/refund. Durable operation,
-multi-instance locks and webhook verification are outside this kit. Do not retry an old
-payment after losing its record; inspect its PayPal state first. Public demo deployments
-also need team decisions on user authentication, storage and dependencies before broader use.
+[Render Express deployment](https://render.com/docs/deploy-node-express-app) ·
+[Blueprint reference](https://render.com/docs/blueprint-spec)
 
-## Official references
+## Official PayPal references
 
-- https://developer.paypal.com/api/get-started/
-- https://developer.paypal.com/sandbox-testing/accounts
-- https://developer.paypal.com/api/orders/v2/orders-create
-- https://developer.paypal.com/api/payments/v2/
-- https://developer.paypal.com/api/transaction-search/v1/search-get
-- https://developer.paypal.com/disputes/set-up/
-- https://developer.paypal.com/disputes/test-go-live
-- https://render.com/docs/deploy-node-express-app
-- https://render.com/docs/configure-environment-variables
+- [Sandbox accounts](https://developer.paypal.com/sandbox-testing/accounts)
+- [Orders API](https://developer.paypal.com/api/orders/v2/)
+- [Payments API](https://developer.paypal.com/api/payments/v2/)
+- [Transaction Search](https://developer.paypal.com/api/transaction-search/v1/)

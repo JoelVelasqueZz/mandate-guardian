@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: mandate-guardian-demo
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22.22.2"
+      - key: PAYPAL_PLAN
+        value: "A"
+      - key: PAYPAL_BASE_URL
+        value: "https://api-m.sandbox.paypal.com"
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: DEMO_API_KEY
+        generateValue: true
+      - key: ENABLE_DEMO_SCENARIO
+        value: "true"

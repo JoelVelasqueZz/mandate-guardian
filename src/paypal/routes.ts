@@ -15,7 +15,9 @@ function requireFlow(condition: unknown, message: string, status = 409): asserts
   if (!condition) throw new FlowError(status, message);
 }
 function baseUrl(env: NodeJS.ProcessEnv) {
-  const url = new URL(env.APP_BASE_URL ?? "http://localhost:3000");
+  const origin = env.APP_BASE_URL || env.RENDER_EXTERNAL_URL || "http://localhost:3000";
+  requireFlow(URL.canParse(origin), "Set APP_BASE_URL to a valid app origin.", 503);
+  const url = new URL(origin);
   requireFlow(url.protocol === "https:" || (url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname)),
     "APP_BASE_URL must use HTTPS, or HTTP on localhost.", 503);
   return url.origin;
@@ -100,10 +102,17 @@ export function createPayPalRouter(store: Store, options: {
         return res.status(400).type("text").send("Invalid PayPal return. Check the order in the app.");
       }
     }
-    res.type("html").send("<!doctype html><html lang='en'><meta charset='utf-8'><title>PayPal Sandbox</title><h1>Return received</h1><p>Go back to the app or terminal and verify buyer approval. Returning here does not prove that a payment was captured.</p></html>");
+    res.set("Cache-Control", "no-store").type("html").send("<!doctype html><html lang='en'><meta charset='utf-8'><title>PayPal Sandbox</title><h1>Return received</h1><p>Buyer approval still needs to be verified.</p><p><a href='/?checkout=returned'>Return to the dashboard</a></p></html>");
   });
   router.get("/paypal/cancel", (_req, res) => res.type("html").send(
-    "<!doctype html><html lang='en'><meta charset='utf-8'><title>PayPal Sandbox</title><h1>Checkout cancelled</h1><p>No capture was requested by this return page. You can reopen the approval link in the app.</p></html>"));
+    "<!doctype html><html lang='en'><meta charset='utf-8'><title>PayPal Sandbox</title><h1>Checkout cancelled</h1><p>You can reopen checkout from your proposal.</p><p><a href='/?checkout=cancelled'>Return to the dashboard</a></p></html>"));
+
+  router.post("/api/proposals/:id/confirm", gate, withRecord(async (_req, res, record) => {
+    requireFlow(record.status === "awaiting_human", `Cannot confirm a proposal in status ${record.status}.`);
+    record.status = "approved";
+    store.upsert(record);
+    res.json(record);
+  }));
 
   router.post("/api/proposals/:id/pay", gate, withRecord(async (_req, res, record) => {
     requireFlow(["approved", "awaiting_paypal"].includes(record.status), `Cannot pay a proposal in status ${record.status}.`);
@@ -111,13 +120,13 @@ export function createPayPalRouter(store: Store, options: {
     recheck(record);
     requireFlow(env.PAYPAL_PLAN === "A" || env.PAYPAL_PLAN === "B", "Set PAYPAL_PLAN to A or B after the sandbox decision.", 503);
     const intent = env.PAYPAL_PLAN === "A" ? "AUTHORIZE" : "CAPTURE";
+    const origin = baseUrl(env);
     // Store pending state BEFORE the network call. Retries reuse both URLs and request ID.
     record.paypal = { ...record.paypal, intent,
       returnState: record.paypal?.returnState ?? randomUUID() };
     record.status = "awaiting_paypal";
     store.upsert(record);
     const params = new URLSearchParams({ proposalId: record.proposal.id, state: record.paypal.returnState! });
-    const origin = baseUrl(env);
     const order = await client().createOrder(record.proposal.price, record.proposal.currency, record.proposal.title,
       intent, requestIdFor("create", record.proposal.id), {
         returnUrl: `${origin}/paypal/return?${params}`, cancelUrl: `${origin}/paypal/cancel`,
@@ -129,7 +138,8 @@ export function createPayPalRouter(store: Store, options: {
   }));
   router.get("/api/proposals/:id/paypal", gate, withRecord(async (_req, res, record) => {
     requireFlow(record.paypal?.orderId, "No order exists.");
-    res.json({ record, order: await client().getOrder(record.paypal.orderId) });
+    const { id, status, intent } = await client().getOrder(record.paypal.orderId);
+    res.json({ record, order: { id, status, intent } });
   }, false));
   router.post("/api/proposals/:id/authorize", gate, withRecord(async (_req, res, record) => {
     if (record.status === "authorized") return res.json(record);
@@ -189,6 +199,7 @@ export function createPayPalRouter(store: Store, options: {
     requireFlow(record.paypal?.captureId && ["captured", "capture_pending", "alert", "reconciled"].includes(record.status), "No eligible capture to reconcile.");
     const capture = await client().getCapture(record.paypal.captureId);
     saveCapture(record, capture);
+    if (capture.status === "PENDING") return res.status(202).json(record);
     requireFlow(capture.status === "COMPLETED", `Capture is ${capture.status}, not COMPLETED.`);
     const currencyMatches = capture.amount?.currency_code === record.proposal.currency;
     record.reconciliation = currencyMatches ? { ...reconcile(record), source: "paypal_capture" } : {
@@ -213,7 +224,8 @@ export function createPayPalRouter(store: Store, options: {
   router.post("/api/proposals/:id/refund", gate, withRecord(async (req, res, record) => {
     requireFlow(req.body?.confirm === true, "Explicit human confirmation is required: {confirm:true}.", 400);
     if (record.status === "refunded") return res.json(record);
-    requireFlow(record.paypal?.captureId && ["captured", "reconciled", "alert", "refund_pending"].includes(record.status), "No capture available to refund.");
+    requireFlow(record.paypal?.captureId && record.paypal.captureStatus === "COMPLETED" &&
+      ["captured", "reconciled", "alert", "refund_pending"].includes(record.status), "No completed capture available to refund.");
     // The MVP performs ONE full refund; it never refunds a simulated excess amount.
     const refund = record.paypal.refundId
       ? await client().getRefund(record.paypal.refundId)
