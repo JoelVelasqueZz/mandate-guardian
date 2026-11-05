@@ -3,6 +3,8 @@ import type { Finding, Mandate, Proposal, Verdict } from "../types.js";
 export interface RuleContext {
   /** Amount already spent this month under this mandate. */
   spentThisMonth: number;
+  /** Result of reading the live listing on the server. A failed check blocks the proposal. */
+  priceVerification?: { ok: boolean; detail: string };
 }
 
 /** Pure, deterministic checks. No AI here on purpose: hard caps must be predictable. */
@@ -42,6 +44,10 @@ export function runRules(mandate: Mandate, proposal: Proposal, ctx: RuleContext)
       ok: new Date(proposal.estimatedDelivery) <= new Date(mandate.deliverBy),
       detail: `Delivery ${proposal.estimatedDelivery} vs deadline ${mandate.deliverBy}.`,
     });
+  }
+
+  if (ctx.priceVerification) {
+    findings.push({ rule: "price_verified", ok: ctx.priceVerification.ok, detail: ctx.priceVerification.detail });
   }
 
   if (proposal.listedPrice !== undefined) {

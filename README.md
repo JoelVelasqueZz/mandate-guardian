@@ -46,10 +46,12 @@ then reconciles what was charged and recommends a refund when something doesn't 
   against the live API: search and product re-read return title, offers with `price.price`,
   `availability` and the merchant `domain` (no separate seller name), and a full `/shop` run proposed
   a real product that the Guardian approved.
-- **Listing re-check:** before the Guardian reviews a proposal that has a `productId`, the server
-  re-reads the live listing and sets `listedPrice` itself, so the `price_matches_listing` rule
-  compares against the catalog, not against what the buyer claimed. If the listing cannot be re-read,
-  the proposal goes to a human.
+- **Server-side price verification** (`src/guardian/listing.ts`): the server reads the product from
+  the catalog by `productId` and sets `listedPrice` itself; a `listedPrice` sent by the client is always
+  discarded. The `price_verified` and `price_matches_listing` rules then compare the proposed price with
+  the catalog. A proposal with no `productId`, an unknown product, a currency mismatch or a catalog
+  that cannot be reached is **blocked** (it fails closed). Unit and endpoint tests cover each case;
+  against the demo catalog only, not repeated against live Channel3 after this change.
 - **Natural-language mandates** (`src/mandate/parse-mandate.ts`, needs the AI model): turns a request
   such as "a gift for my mom, max $40, by Friday" into a mandate draft for the user to review. The
   model never invents a spending cap; missing caps come back as questions.
