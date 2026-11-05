@@ -39,9 +39,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-extrabold text-slate-900">
-                Configuración de Acceso Sandbox
+                Payment access
               </h3>
-              <p className="text-xs text-slate-500">Credenciales del entorno PayPal & API</p>
+              <p className="text-xs text-slate-500">Demo key for the PayPal Sandbox actions</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:text-slate-700">
@@ -52,11 +52,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <form onSubmit={handleSave} className="p-6 space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              DEMO_API_KEY (Token de Autorización de Pagos)
+              DEMO_API_KEY
             </label>
             <p className="text-xs text-slate-500 mb-3">
-              Requerido por las rutas de pago (<code>/pay</code>, <code>/authorize</code>, <code>/capture</code>, <code>/refund</code>).
-              Se envía como <code>Authorization: Bearer &lt;DEMO_API_KEY&gt;</code>.
+              Required by the payment routes (<code>/pay</code>, <code>/authorize</code>, <code>/capture</code>, <code>/refund</code>).
+              Enter the value you set in the server's <code>.env</code>. It is sent as <code>Authorization: Bearer &lt;DEMO_API_KEY&gt;</code>
+              and kept only in this browser tab's session storage.
             </p>
             <div className="relative">
               <input
@@ -64,7 +65,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 autoComplete="off"
                 value={val}
                 onChange={(e) => setVal(e.target.value)}
-                placeholder="Ingresa tu DEMO_API_KEY..."
+                placeholder="Paste your DEMO_API_KEY"
                 className="w-full text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-paypal-vibrant"
               />
             </div>
@@ -73,10 +74,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-900 space-y-2">
             <div className="flex items-center gap-1.5 font-bold text-paypal-vibrant">
               <ShieldCheck className="w-4 h-4" />
-              <span>Seguridad del Frontend</span>
+              <span>Frontend security</span>
             </div>
             <p className="text-[11px] text-slate-600 leading-relaxed">
-              Las credenciales de PayPal (<code>PAYPAL_CLIENT_ID</code> y <code>PAYPAL_CLIENT_SECRET</code>) se mantienen exclusivamente en el servidor backend en <code>.env</code>. La <code>DEMO_API_KEY</code> sirve como llave de guardia para que el frontend invoque las operaciones de sandbox de forma segura.
+              The PayPal credentials (<code>PAYPAL_CLIENT_ID</code> and <code>PAYPAL_CLIENT_SECRET</code>) stay on the server in <code>.env</code> and never reach the browser. The demo key is a shared access key for this demo, not a user login. Do not expose this app publicly with real keys.
             </p>
           </div>
 
@@ -86,14 +87,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               onClick={onClose}
               className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
             >
-              Cancelar
+              Cancel
             </button>
             <button
               type="submit"
               className="px-5 py-2.5 rounded-xl bg-paypal-vibrant hover:bg-paypal-blue text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5"
             >
               {saved ? <Check className="w-4 h-4" /> : null}
-              <span>{saved ? "Guardado" : "Guardar Clave"}</span>
+              <span>{saved ? "Saved" : "Save key"}</span>
             </button>
           </div>
         </form>

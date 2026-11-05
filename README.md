@@ -55,10 +55,14 @@ then reconciles what was charged and recommends a refund when something doesn't 
 - **Natural-language mandates** (`src/mandate/parse-mandate.ts`, needs the AI model): turns a request
   such as "a gift for my mom, max $40, by Friday" into a mandate draft for the user to review. The
   model never invents a spending cap; missing caps come back as questions.
-- **Dashboard and REST API:** the AG Grid dashboard shows Guardian decisions, PayPal Sandbox
-  states and reconciliation. Mock mode uses browser-only sample rows. API Backend mode loads
-  audit records from the Express server and supports the full Plan A checkout sequence.
-  Data is held in memory and cleared on restart.
+- **Dashboard** (`client/`, React + AG Grid, served by the API after `npm run build`): shows the audit
+  records from `/api/records`, creates mandates, runs the buyer agent and drives the Plan A checkout
+  (open the PayPal Sandbox checkout, verify the buyer approval and authorize, capture or void,
+  reconcile, refund). It reads everything from the API; it has no sample data and no mock mode.
+  The payment and human-confirmation buttons need the `DEMO_API_KEY`, which you type in Settings
+  (masked, kept in the browser tab's session storage only).
+- **REST API** (Express, in-memory store, data is lost on restart) with unit tests for the Guardian,
+  AI reviewer, buyer agent, Channel3 and PayPal routes.
 
 See the [PayPal Sandbox setup, demo run and Render instructions](docs/PAYPAL-TESTING.md).
 
@@ -95,8 +99,7 @@ npm run build
 npm start
 ```
 
-Open [localhost:3000](http://localhost:3000). The dashboard opens in Mock mode for a
-credential-free walkthrough. Switch to **API Backend** to use the integrated server.
+Open [localhost:3000](http://localhost:3000). Without keys the app uses the labeled offline catalog.
 For PayPal checkout, configure the seller and separate Personal Sandbox buyer
 using the [testing guide](docs/PAYPAL-TESTING.md). Run `npm run verify:plan-a`
 in a second terminal to produce two audit files.
@@ -131,6 +134,9 @@ curl -s -X POST localhost:3000/api/mandates -H "Content-Type: application/json" 
 # then, with the returned id:
 curl -s -X POST localhost:3000/api/mandates/<id>/shop -H "Content-Type: application/json" -d '{}'
 ```
+
+For development, `npm run dev` runs the API and `npx vite` runs the dashboard on port 5173 with a
+proxy to the API.
 
 ## API
 

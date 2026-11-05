@@ -36,10 +36,9 @@ npm.cmd start
 ```
 
 The built app serves the dashboard and API from one origin at
-[localhost:3000](http://localhost:3000). Select **API Backend** in the dashboard to see
-server records. Enter the same `DEMO_API_KEY` in its settings for payment actions. The
-browser retains it for the current tab through checkout. The **Mock** mode has separate
-sample data and simulates checkout entirely in the browser.
+[localhost:3000](http://localhost:3000). The dashboard shows the server records only; it has no
+sample data. Enter the same `DEMO_API_KEY` in its settings for payment and confirmation actions. The
+browser retains it for the current tab through checkout.
 
 ## Run two integrated Sandbox rounds
 

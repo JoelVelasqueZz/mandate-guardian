@@ -114,49 +114,11 @@ app.get("/api/records", (_req, res) => {
   }));
 });
 
-// Serve static frontend build and Agentic/SEO endpoints
+// Serve the built dashboard (npm run build) when it exists
 const clientDist = path.resolve(process.cwd(), "dist/client");
 
 app.get("/robots.txt", (_req, res) => {
   res.type("text/plain").send("User-agent: *\nAllow: /\n");
-});
-
-app.get("/llms.txt", (_req, res) => {
-  const filePath = path.join(clientDist, "llms.txt");
-  if (fs.existsSync(filePath)) {
-    return res.type("text/markdown; charset=utf-8").sendFile(filePath);
-  }
-  res.type("text/markdown; charset=utf-8").send("# Mandate & Guardian\n\n> Trust Layer for AI Shopping Agents.\n\n- [API](/api/health): Health endpoint\n- [Records](/api/records): Audit records\n");
-});
-
-app.get(["/ai-catalog.json", "/.well-known/ai-catalog.json"], (_req, res) => {
-  const filePath = path.join(clientDist, "ai-catalog.json");
-  if (fs.existsSync(filePath)) {
-    return res.type("application/json").sendFile(filePath);
-  }
-  res.json({
-    specVersion: "1.0",
-    host: {
-      displayName: "Mandate & Guardian",
-      identifier: "http://localhost:3001",
-    },
-    entries: [
-      {
-        identifier: "urn:air:mandateguardian.local:agent:guardian-auditor",
-        displayName: "Guardian Auditor Agent",
-        type: "application/a2a-agent-card+json",
-        description: "Deterministic safety rules engine auditing purchase proposals before payment execution",
-        url: "http://localhost:3001/api/records",
-      },
-      {
-        identifier: "urn:air:mandateguardian.local:agent:mandate-buyer",
-        displayName: "Mandate Buyer Agent",
-        type: "application/a2a-agent-card+json",
-        description: "Catalog search and offer evaluation agent connecting to Channel3",
-        url: "http://localhost:3001/api/mandates",
-      },
-    ],
-  });
 });
 
 if (fs.existsSync(clientDist)) {

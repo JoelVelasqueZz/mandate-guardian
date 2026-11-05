@@ -9,7 +9,7 @@ interface MandateSectionProps {
   onCreateMandate: (data: Omit<Mandate, "id">) => Promise<void>;
   onRunShop: (mandateId: string, query?: string) => Promise<void>;
   onParseNaturalLanguage: (text: string) => Promise<Partial<Mandate> | null>;
-  isMockMode: boolean;
+  aiAvailable: boolean;
   loading: boolean;
 }
 
@@ -20,7 +20,7 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
   onCreateMandate,
   onRunShop,
   onParseNaturalLanguage,
-  isMockMode,
+  aiAvailable,
   loading,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -31,16 +31,16 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
   const [isShopping, setIsShopping] = useState(false);
 
   // Natural language & form state
-  const [nlText, setNlText] = useState("Un regalo de cumpleaños para mamá, presupuesto máximo $40, antes del viernes");
+  const [nlText, setNlText] = useState("");
   const [isParsing, setIsParsing] = useState(false);
 
   // Form fields
   const [goal, setGoal] = useState("");
   const [maxPerPurchase, setMaxPerPurchase] = useState<number>(50);
   const [maxMonthly, setMaxMonthly] = useState<number>(200);
-  const [requireHumanAbove, setRequireHumanAbove] = useState<number>(35);
-  const [deliverBy, setDeliverBy] = useState("2026-11-25");
-  const [categories, setCategories] = useState("Gifts, Electronics, Fashion");
+  const [requireHumanAbove, setRequireHumanAbove] = useState<number | "">("");
+  const [deliverBy, setDeliverBy] = useState("");
+  const [categories, setCategories] = useState("");
 
   const handleParseNl = async () => {
     if (!nlText.trim()) return;
@@ -68,7 +68,7 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
       currency: "USD",
       maxPerPurchase: Number(maxPerPurchase),
       maxMonthly: Number(maxMonthly),
-      requireHumanAbove: requireHumanAbove ? Number(requireHumanAbove) : undefined,
+      requireHumanAbove: requireHumanAbove !== "" ? Number(requireHumanAbove) : undefined,
       deliverBy: deliverBy || undefined,
       allowedCategories: categories
         ? categories.split(",").map((c) => c.trim()).filter(Boolean)
@@ -100,14 +100,14 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span id="mandate-section-heading" className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                Mandato Activo del Usuario
+                Active mandate
               </span>
               <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-950 border border-emerald-300">
-                Reglas Deterministas
+                Deterministic rules
               </span>
             </div>
             <h2 className="text-base font-extrabold text-slate-900 line-clamp-1">
-              {activeMandate ? activeMandate.goal : "Ningún mandato seleccionado"}
+              {activeMandate ? activeMandate.goal : "No mandate selected. Create one below."}
             </h2>
           </div>
         </div>
@@ -117,17 +117,17 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
           {activeMandate && (
             <div className="hidden md:flex items-center gap-2 text-xs text-slate-700 bg-slate-100/90 px-3 py-1.5 rounded-xl border border-slate-200">
               <span className="font-medium">
-                Tope Compra: <strong className="text-slate-950">${activeMandate.maxPerPurchase}</strong>
+                Per-purchase cap: <strong className="text-slate-950">${activeMandate.maxPerPurchase}</strong>
               </span>
               <span className="text-slate-400" aria-hidden="true">|</span>
               <span className="font-medium">
-                Tope Mensual: <strong className="text-slate-950">${activeMandate.maxMonthly}</strong>
+                Monthly cap: <strong className="text-slate-950">${activeMandate.maxMonthly}</strong>
               </span>
               {activeMandate.requireHumanAbove && (
                 <>
                   <span className="text-slate-400" aria-hidden="true">|</span>
                   <span className="font-medium text-amber-900">
-                    Humano &gt; <strong className="text-amber-950">${activeMandate.requireHumanAbove}</strong>
+                    Ask a human above <strong className="text-amber-950">${activeMandate.requireHumanAbove}</strong>
                   </span>
                 </>
               )}
@@ -138,11 +138,11 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
           {mandates.length > 1 && (
             <div className="flex items-center gap-1.5">
               <label htmlFor="active-mandate-select" className="sr-only">
-                Seleccionar mandato activo de compra
+                Select the active mandate
               </label>
               <select
                 id="active-mandate-select"
-                aria-label="Seleccionar mandato activo de compra"
+                aria-label="Select the active mandate"
                 value={activeMandate?.id}
                 onChange={(e) => {
                   const found = mandates.find((m) => m.id === e.target.value);
@@ -163,10 +163,10 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
           <button
             onClick={() => setIsOpen(!isOpen)}
             aria-expanded={isOpen}
-            aria-label={isOpen ? "Ocultar panel de controles de mandato" : "Mostrar panel de controles de mandato"}
+            aria-label={isOpen ? "Hide the mandate controls" : "Show the mandate controls"}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-paypal-vibrant bg-paypal-light hover:bg-blue-100/70 border border-blue-200/80 transition-colors"
           >
-            <span>{isOpen ? "Ocultar Controles" : "Lanzar Agente / Nuevo"}</span>
+            <span>{isOpen ? "Hide controls" : "Run agent / New mandate"}</span>
             {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
         </div>
@@ -188,7 +188,7 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
               }`}
             >
               <ShoppingBag className="w-4 h-4" />
-              <span>Ejecutar Agente Comprador (Mandate Shop)</span>
+              <span>Run the buyer agent</span>
             </button>
             <button
               role="tab"
@@ -201,7 +201,7 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
               }`}
             >
               <Sparkles className="w-4 h-4 text-indigo-600" />
-              <span>Crear Mandato con IA (Lenguaje Natural)</span>
+              <span>Create a mandate</span>
             </button>
           </div>
 
@@ -210,26 +210,26 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
             <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm">
               <div className="max-w-3xl">
                 <h3 className="text-sm font-bold text-slate-900 mb-1 flex items-center gap-2">
-                  <span>Buscar en Channel3 & Evaluar con Auditor Guardian</span>
+                  <span>Search products and have Guardian review the pick</span>
                   <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
                     The agent that spends is not the one that watches
                   </span>
                 </h3>
                 <p className="text-xs text-slate-600 mb-4">
-                  El agente comprador <strong>Mandate</strong> buscará productos en el catálogo de Channel3 que cumplan el objetivo y límites. La propuesta llegará inmediatamente al <strong>Guardian</strong>, quien re-verificará el precio en vivo y evaluará las reglas antes de cualquier pago.
+                  The buyer agent <strong>Mandate</strong> searches the catalog for products that fit the goal and the caps. Its proposal goes straight to <strong>Guardian</strong>, which re-reads the price from the catalog and checks the rules before any payment.
                 </p>
 
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <label htmlFor="shop-search-input" className="sr-only">
-                      Buscar producto en catálogo
+                      Search the catalog
                     </label>
                     <input
                       id="shop-search-input"
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder={activeMandate ? `Opcional: refinar búsqueda (ej. ${activeMandate.goal})` : "Describe el producto deseado..."}
+                      placeholder={activeMandate ? `Optional: refine the search (default: ${activeMandate.goal})` : "Create a mandate first"}
                       className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-slate-900 placeholder-slate-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-paypal-vibrant"
                       onKeyDown={(e) => e.key === "Enter" && handleShop()}
                     />
@@ -237,11 +237,11 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
                   <button
                     onClick={handleShop}
                     disabled={isShopping || !activeMandate}
-                    aria-label="Lanzar agente comprador para buscar ofertas en Channel3"
+                    aria-label="Run the buyer agent to search for offers"
                     className="px-5 py-3 rounded-xl bg-paypal-vibrant hover:bg-paypal-blue text-white font-bold text-xs shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
                   >
                     <ShoppingBag className={`w-4 h-4 ${isShopping ? "animate-bounce" : ""}`} />
-                    <span>{isShopping ? "Buscando en Channel3..." : "Lanzar Comprador (Shop)"}</span>
+                    <span>{isShopping ? "Searching..." : "Run buyer agent"}</span>
                   </button>
                 </div>
               </div>
@@ -255,16 +255,16 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
               <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-indigo-600" /> Asistente de Lenguaje Natural (Gemini)
+                    <Sparkles className="w-4 h-4 text-indigo-600" /> Natural-language assistant
                   </span>
                   <span className="text-[11px] text-slate-600 font-mono">POST /api/mandates/parse</span>
                 </div>
                 <p className="text-xs text-slate-600 mb-3">
-                  Escribe tu regla de compra en lenguaje natural. La IA extraerá los topes y restricciones sin inventar presupuestos.
+                  Describe what you want to buy and your limits. The model fills in the form below and never invents a spending cap; missing caps come back as questions. {aiAvailable ? "" : "The AI model is not configured on the server, so fill in the form by hand."}
                 </p>
 
                 <label htmlFor="nl-mandate-textarea" className="sr-only">
-                  Instrucción de compra en lenguaje natural
+                  Purchase request in plain language
                 </label>
                 <textarea
                   id="nl-mandate-textarea"
@@ -272,31 +272,31 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
                   onChange={(e) => setNlText(e.target.value)}
                   rows={3}
                   className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl p-3 text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"
-                  placeholder="Ej: Un regalo para mamá, máximo $40, antes del viernes..."
+                  placeholder="e.g. A birthday gift for my mom, max $40, by Friday"
                 />
 
                 <button
                   type="button"
                   onClick={handleParseNl}
-                  disabled={isParsing}
-                  aria-label="Extraer parámetros del mandato con inteligencia artificial"
+                  disabled={isParsing || !aiAvailable}
+                  aria-label="Fill the mandate form with the AI model"
                   className="w-full py-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-channel3-accent font-bold text-xs border border-indigo-300 transition-colors flex items-center justify-center gap-2"
                 >
                   <Sparkles className={`w-4 h-4 ${isParsing ? "animate-spin" : ""}`} />
-                  <span>{isParsing ? "Analizando con IA..." : "Extraer Parámetros del Mandato"}</span>
+                  <span>{isParsing ? "Reading..." : "Fill the form from text"}</span>
                 </button>
               </div>
 
               {/* Structured Form */}
               <form onSubmit={handleCreate} className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm">
                 <span className="text-xs font-bold text-slate-900 block mb-3">
-                  Parámetros Deterministas del Mandato
+                  Mandate rules (enforced by code)
                 </span>
 
                 <div className="space-y-3">
                   <div>
                     <label htmlFor="mandate-goal-input" className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Objetivo del Mandato *
+                      Goal *
                     </label>
                     <input
                       id="mandate-goal-input"
@@ -304,7 +304,7 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
                       required
                       value={goal}
                       onChange={(e) => setGoal(e.target.value)}
-                      placeholder="Ej. Regalo para el día de la madre"
+                      placeholder="e.g. Birthday gift for my mom"
                       className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-paypal-vibrant"
                     />
                   </div>
@@ -312,7 +312,7 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
                   <div className="grid grid-cols-3 gap-3">
                     <div>
                       <label htmlFor="mandate-max-purchase-input" className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Tope Compra ($) *
+                        Per-purchase cap ($) *
                       </label>
                       <input
                         id="mandate-max-purchase-input"
@@ -326,7 +326,7 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
                     </div>
                     <div>
                       <label htmlFor="mandate-max-monthly-input" className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Tope Mensual ($) *
+                        Monthly cap ($) *
                       </label>
                       <input
                         id="mandate-max-monthly-input"
@@ -340,15 +340,15 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
                     </div>
                     <div>
                       <label htmlFor="mandate-require-human-input" className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Confirmar Humano &gt; ($)
+                        Ask a human above ($)
                       </label>
                       <input
                         id="mandate-require-human-input"
                         type="number"
                         min={1}
                         value={requireHumanAbove}
-                        onChange={(e) => setRequireHumanAbove(Number(e.target.value))}
-                        placeholder="Opcional"
+                        onChange={(e) => setRequireHumanAbove(e.target.value === "" ? "" : Number(e.target.value))}
+                        placeholder="Optional"
                         className="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-paypal-vibrant"
                       />
                     </div>
@@ -357,7 +357,7 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label htmlFor="mandate-categories-input" className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Categorías Permitidas
+                        Allowed categories
                       </label>
                       <input
                         id="mandate-categories-input"
@@ -370,7 +370,7 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
                     </div>
                     <div>
                       <label htmlFor="mandate-delivery-input" className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Fecha Límite Entrega
+                        Deliver by
                       </label>
                       <input
                         id="mandate-delivery-input"
@@ -384,11 +384,11 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
 
                   <button
                     type="submit"
-                    aria-label="Guardar configuración del nuevo mandato de compra"
+                    aria-label="Save the new mandate"
                     className="w-full py-2.5 rounded-xl bg-paypal-navy hover:bg-slate-900 text-white font-bold text-xs transition-colors shadow-sm flex items-center justify-center gap-2 mt-2"
                   >
                     <Plus className="w-4 h-4 text-paypal-gold" />
-                    <span>Guardar Mandato Activo</span>
+                    <span>Save mandate</span>
                   </button>
                 </div>
               </form>
