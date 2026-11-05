@@ -29,6 +29,9 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ records, activeManda
   const alertsCount = records.filter(r => r.status === "alert").length;
   const reconciledCount = records.filter(r => r.status === "reconciled").length;
   const refundedCount = records.filter(r => r.status === "refunded").length;
+  // Money the Guardian kept from leaving, and money PayPal returned.
+  const stoppedValue = records.filter(r => r.status === "blocked").reduce((sum, r) => sum + r.proposal.price, 0);
+  const refundedValue = records.filter(r => r.status === "refunded").reduce((sum, r) => sum + (r.paypal?.charged ?? r.proposal.price), 0);
 
   return (
     <section aria-label="Audit summary metrics" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -104,6 +107,10 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ records, activeManda
             <span className="font-extrabold text-amber-900">{awaitingHumanCount}</span>
           </div>
         </div>
+        <div className="flex items-center justify-between text-xs mt-2 pt-2 border-t border-slate-100">
+          <span className="text-slate-700 font-semibold">Stopped before payment:</span>
+          <span className="font-extrabold text-emerald-900">${stoppedValue.toFixed(2)}</span>
+        </div>
       </div>
 
       {/* 3. PayPal Sandbox Pipeline */}
@@ -169,7 +176,7 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ records, activeManda
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-700 font-semibold">Refunded:</span>
-            <span className="font-extrabold text-slate-900">{refundedCount}</span>
+            <span className="font-extrabold text-slate-900">{refundedCount}{refundedValue > 0 ? ` ($${refundedValue.toFixed(2)})` : ""}</span>
           </div>
         </div>
       </div>

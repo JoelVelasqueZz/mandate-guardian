@@ -3,12 +3,14 @@ import { Navbar } from "./components/Navbar";
 import { SummaryCards } from "./components/SummaryCards";
 import { MandateSection } from "./components/MandateSection";
 import { AuditGrid } from "./components/AuditGrid";
-import { AuditRecord, Mandate, SystemHealth } from "./types";
+import { AuditEvent, AuditRecord, ChainCheck, Mandate, SystemHealth } from "./types";
+import { GettingStarted } from "./components/GettingStarted";
 import { api } from "./api";
 import { CheckCircle2, AlertCircle, Info, X } from "lucide-react";
 
 // Lazy load modals to keep the initial JavaScript payload small
 const DetailModal = lazy(() => import("./components/DetailModal").then((m) => ({ default: m.DetailModal })));
+const RedTeamModal = lazy(() => import("./components/RedTeamModal").then((m) => ({ default: m.RedTeamModal })));
 const SettingsModal = lazy(() => import("./components/SettingsModal").then((m) => ({ default: m.SettingsModal })));
 
 const DEMO_KEY_STORAGE = "mg_demo_key";
@@ -29,6 +31,9 @@ export const App: React.FC = () => {
   const [activeMandate, setActiveMandate] = useState<Mandate | undefined>(undefined);
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
   const [demoKey, setDemoKey] = useState<string>(loadDemoKey);
+  const [chain, setChain] = useState<ChainCheck | null>(null);
+  const [events, setEvents] = useState<AuditEvent[]>([]);
+  const [isRedTeamOpen, setIsRedTeamOpen] = useState(false);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -54,7 +59,9 @@ export const App: React.FC = () => {
   const refresh = useCallback(async (quiet = false) => {
     setLoading(true);
     try {
-      const [health, recs, saved] = await Promise.all([api.getHealth(), api.getRecords(), api.getMandates()]);
+      const [health, recs, saved, log] = await Promise.all([api.getHealth(), api.getRecords(), api.getMandates(), api.getAuditLog()]);
+      setChain({ ok: log.ok, length: log.length, headHash: log.headHash, brokenAt: log.brokenAt });
+      setEvents(log.events);
       setSystemHealth(health);
       setRecords(recs);
       setMandates(saved);
@@ -83,6 +90,13 @@ export const App: React.FC = () => {
 
   const selectedRecord = records.find((r) => r.proposal.id === selectedId) ?? null;
 
+  /** The audit log grows with every step, so reread it after each action. */
+  const refreshAudit = () =>
+    api.getAuditLog().then((log) => {
+      setChain({ ok: log.ok, length: log.length, headHash: log.headHash, brokenAt: log.brokenAt });
+      setEvents(log.events);
+    }).catch(() => undefined);
+
   const replaceRecord = (updated: AuditRecord) =>
     setRecords((prev) => prev.map((r) => (r.proposal.id === updated.proposal.id ? updated : r)));
 
@@ -95,6 +109,7 @@ export const App: React.FC = () => {
       showToast("error", e instanceof Error ? e.message : "Something went wrong.");
     } finally {
       setLoading(false);
+      refreshAudit();
     }
   };
 
@@ -203,6 +218,31 @@ export const App: React.FC = () => {
     });
   };
 
+  const handleDownloadEvidence = async (id: string) => {
+    if (needsKey()) return;
+    try {
+      const text = await api.downloadEvidence(id, demoKey);
+      const url = URL.createObjectURL(new Blob([text], { type: "text/markdown" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `evidence-${id.slice(0, 8)}.md`;
+      link.click();
+      URL.revokeObjectURL(url);
+      showToast("success", "Evidence packet downloaded.");
+    } catch (e) {
+      showToast("error", e instanceof Error ? e.message : "Could not build the evidence packet.");
+    }
+  };
+
+  const handleUseExampleMandate = () =>
+    handleCreateMandate({
+      goal: "a birthday gift for my mom",
+      currency: "USD",
+      maxPerPurchase: 40,
+      maxMonthly: 100,
+      allowedCategories: [],
+    });
+
   const handleCreateMandate = (data: Omit<Mandate, "id">) =>
     act(async () => {
       const created = await api.createMandate(data);
@@ -249,6 +289,8 @@ export const App: React.FC = () => {
 
       <Navbar
         systemHealth={systemHealth}
+        chain={chain}
+        onOpenRedTeam={() => setIsRedTeamOpen(true)}
         demoKey={demoKey}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onRefresh={() => refresh()}
@@ -257,6 +299,15 @@ export const App: React.FC = () => {
 
       <main className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
         <SummaryCards records={records} activeMandate={activeMandate} />
+
+        {!activeMandate && (
+          <GettingStarted
+            onUseExample={handleUseExampleMandate}
+            onOpenRedTeam={() => setIsRedTeamOpen(true)}
+            loading={loading}
+            catalogIsDemo={systemHealth?.catalog !== "channel3"}
+          />
+        )}
 
         <MandateSection
           mandates={mandates}
@@ -302,6 +353,9 @@ export const App: React.FC = () => {
         {selectedRecord && (
           <DetailModal
             record={selectedRecord}
+            events={events.filter((e) => e.proposalId === selectedRecord.proposal.id)}
+            onDownloadEvidence={handleDownloadEvidence}
+            onVerifyReceipt={async (receipt) => (await api.verifyReceipt(receipt)).valid}
             onClose={() => setSelectedId(null)}
             onConfirmHuman={handleConfirmHuman}
             onPayWithPayPal={handlePayWithPayPal}
@@ -311,6 +365,14 @@ export const App: React.FC = () => {
             onReconcile={handleReconcile}
             onDemoOvercharge={handleDemoOvercharge}
             onRefund={handleRefund}
+          />
+        )}
+
+        {isRedTeamOpen && (
+          <RedTeamModal
+            onClose={() => setIsRedTeamOpen(false)}
+            aiAvailable={Boolean(systemHealth?.ai)}
+            onRun={api.runRedTeam}
           />
         )}
 

@@ -5,17 +5,21 @@ import path from "node:path";
 import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import { MandateSchema, ProposalSchema, type AuditRecord, type Mandate, type Proposal } from "./types.js";
-import { review } from "./guardian/guardian.js";
 import { aiReviewerFromEnv } from "./guardian/ai-reviewer.js";
-import { verifyListing } from "./guardian/listing.js";
+import { reviewAndStore } from "./guardian/submit.js";
+import { signerFromEnv } from "./guardian/receipt.js";
+import { runRedTeam } from "./redteam.js";
+import { rateLimit } from "./ratelimit.js";
+import { buildEvidence, evidenceMarkdown } from "./evidence.js";
 import { llmFromEnv } from "./guardian/llm.js";
 import { catalogFromEnv, type Catalog } from "./channel3/client.js";
 import { runMandate } from "./mandate/agent.js";
 import { parseMandateText } from "./mandate/parse-mandate.js";
 import { Store } from "./store.js";
-import { createPayPalRouter } from "./paypal/routes.js";
+import { createPayPalRouter, demoKeyGate } from "./paypal/routes.js";
 
 const app = express();
+app.set("trust proxy", 1); // behind Render's proxy, so rate limits see the real client address
 app.use(compression());
 app.use(express.json());
 
@@ -31,15 +35,24 @@ const store = new Store();
 const aiReviewer = aiReviewerFromEnv(); // undefined unless AI_API_KEY and AI_MODEL are set
 const llm = llmFromEnv(); // same model, used by the buyer agent
 const catalog: Catalog = catalogFromEnv(); // live Channel3 with CHANNEL3_API_KEY, labeled demo data otherwise
+const signer = signerFromEnv(); // signs the Guardian's approvals; the payment route requires the receipt
+
+// Routes that spend model or catalog quota get a per-IP limit.
+const limitShop = rateLimit({ windowMs: 60_000, max: 20 });
+const limitParse = rateLimit({ windowMs: 60_000, max: 20 });
+const limitProposals = rateLimit({ windowMs: 60_000, max: 60 });
+const limitRedTeam = rateLimit({ windowMs: 60_000, max: 10 });
+const demoKey = demoKeyGate(process.env);
 
 app.get("/api/health", (_req, res) => res.json({
   ok: true, catalog: catalog.source, ai: Boolean(llm),
+  guardianKeyId: signer.keyId, receiptsEphemeral: signer.ephemeral,
   paypalPlan: process.env.PAYPAL_PLAN,
   demoOvercharge: process.env.ENABLE_DEMO_SCENARIO === "true",
 }));
 
 // 0. Natural language -> mandate draft. The user edits and saves it with POST /api/mandates.
-app.post("/api/mandates/parse", async (req, res) => {
+app.post("/api/mandates/parse", limitParse, async (req, res) => {
   const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
   if (!text) return res.status(400).json({ error: "text is required" });
   if (!llm) return res.status(503).json({ error: "AI model not configured (set AI_API_KEY and AI_MODEL)" });
@@ -57,29 +70,11 @@ app.post("/api/mandates", (req, res) => {
 
 app.get("/api/mandates", (_req, res) => res.json([...store.mandates.values()]));
 
-/**
- * Guardian side of a proposal. The price is read from the catalog by productId; a listedPrice sent
- * by the client is always discarded. If the price cannot be verified, the rules block the proposal.
- */
-async function submitProposal(mandate: Mandate, proposal: Proposal): Promise<AuditRecord> {
-  delete proposal.listedPrice;
-  const listing = await verifyListing(catalog, proposal);
-  if (listing.ok) proposal.listedPrice = listing.listedPrice;
-
-  const decision = await review(
-    mandate,
-    proposal,
-    { spentThisMonth: store.spentThisMonth(mandate.id), priceVerification: listing },
-    aiReviewer,
-  );
-  const status = decision.verdict === "approve" ? "approved" : decision.verdict === "block" ? "blocked" : "awaiting_human";
-  const record: AuditRecord = { proposal, decision, status, updatedAt: "" };
-  store.upsert(record);
-  return record;
-}
+const submitProposal = (mandate: Mandate, proposal: Proposal) =>
+  reviewAndStore({ catalog, store, ai: aiReviewer, signer }, mandate, proposal);
 
 // 2. A proposal is submitted. The Guardian reviews it BEFORE any payment.
-app.post("/api/proposals", async (req, res) => {
+app.post("/api/proposals", limitProposals, async (req, res) => {
   const parsed = ProposalSchema.safeParse({ ...req.body, id: randomUUID() });
   if (!parsed.success) return res.status(400).json(parsed.error.flatten());
   const mandate = store.mandates.get(parsed.data.mandateId);
@@ -88,7 +83,7 @@ app.post("/api/proposals", async (req, res) => {
 });
 
 // 2b. The buyer agent (Mandate) shops for a mandate and its proposal goes straight to the Guardian.
-app.post("/api/mandates/:id/shop", async (req, res) => {
+app.post("/api/mandates/:id/shop", limitShop, async (req, res) => {
   const mandate = store.mandates.get(req.params.id);
   if (!mandate) return res.status(404).json({ error: "mandate not found" });
   const query = typeof req.body?.query === "string" ? req.body.query : undefined;
@@ -103,7 +98,52 @@ app.post("/api/mandates/:id/shop", async (req, res) => {
 });
 
 // PayPal sandbox flows, callbacks and reconciliation.
-app.use(createPayPalRouter(store));
+app.use(createPayPalRouter(store, {
+  verifyApproval: (record) => signer.checkRecord(record, store.mandates.get(record.proposal.mandateId)),
+  onHumanConfirm: (record) => {
+    const mandate = store.mandates.get(record.proposal.mandateId);
+    if (mandate) record.receipt = signer.issue(mandate, record, true);
+  },
+}));
+
+// --- Verifiable trail: receipts, the hash-chained log, the red team and the evidence packet ---
+
+app.get("/api/guardian/public-key", (_req, res) =>
+  res.json({ algorithm: "Ed25519", keyId: signer.keyId, publicKeyPem: signer.publicKeyPem, ephemeral: signer.ephemeral }));
+
+app.get("/api/proposals/:id/receipt", (req, res) => {
+  const record = store.records.get(req.params.id);
+  if (!record) return res.status(404).json({ error: "Proposal not found." });
+  if (!record.receipt) return res.status(404).json({ error: "This proposal has no Guardian receipt (it was not approved)." });
+  res.json({ receipt: record.receipt, valid: signer.verifySignature(record.receipt) });
+});
+
+app.post("/api/receipts/verify", (req, res) => {
+  const receipt = req.body?.receipt;
+  if (!receipt?.payload || typeof receipt.signature !== "string") return res.status(400).json({ error: "receipt is required" });
+  res.json({ valid: signer.verifySignature(receipt), keyId: signer.keyId });
+});
+
+app.get("/api/audit-log", (_req, res) => res.json({ ...store.audit.verify(), events: store.audit.events }));
+app.get("/api/audit-log/verify", (_req, res) => res.json(store.audit.verify()));
+
+// Hostile proposals against the real Guardian code, on an isolated store. Never touches real records.
+app.post("/api/redteam/run", limitRedTeam, async (req, res) => {
+  const useAi = req.body?.useAi === true && Boolean(aiReviewer);
+  res.json(await runRedTeam({ ai: useAi ? aiReviewer : undefined }));
+});
+
+// Everything needed to file a dispute or explain a decision. Needs the demo key: it lists PayPal IDs.
+app.get("/api/proposals/:id/evidence", demoKey, (req, res) => {
+  const record = store.records.get(req.params.id);
+  if (!record) return res.status(404).json({ error: "Proposal not found." });
+  const evidence = buildEvidence(record, store, signer);
+  if (req.query.format === "md") {
+    res.type("text/markdown; charset=utf-8").setHeader("Content-Disposition", `attachment; filename="evidence-${record.proposal.id.slice(0, 8)}.md"`);
+    return res.send(evidenceMarkdown(evidence));
+  }
+  res.json(evidence);
+});
 
 // Feed for the AG Grid dashboard.
 app.get("/api/records", (_req, res) => {
