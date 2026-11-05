@@ -55,6 +55,13 @@ then reconciles what was charged and recommends a refund when something doesn't 
 - **Natural-language mandates** (`src/mandate/parse-mandate.ts`, needs the AI model): turns a request
   such as "a gift for my mom, max $40, by Friday" into a mandate draft for the user to review. The
   model never invents a spending cap; missing caps come back as questions.
+- **Dashboard** (`client/`, React + AG Grid, served by the API after `npm run build`): shows the audit
+  records from `/api/records`, runs the buyer agent, creates mandates and drives the payment buttons
+  (authorize, capture, void, reconcile, refund). It reads everything from the API and contains no sample
+  data. Payment buttons need the `DEMO_API_KEY`, which you type in Settings (kept in the tab's session
+  storage only). The mandate list lives in the browser tab, so reload it and you create the mandate again.
+  Smoke-tested on Nov 4 with the offline catalog and no PayPal keys; the payment buttons have not been
+  clicked against live Sandbox yet.
 - **REST API** (Express, in-memory store, data is lost on restart) with unit tests for the Guardian, AI reviewer, buyer agent, Channel3 and PayPal routes.
 
 See [PayPal setup and frontend handoff](docs/PAYPAL-TESTING.md).
@@ -78,7 +85,7 @@ See [PayPal setup and frontend handoff](docs/PAYPAL-TESTING.md).
 
 ## Not built yet
 
-Web UI and AG Grid dashboard, automatic dispute submission, durable storage, webhook handling, user
+Automatic dispute submission, durable storage, webhook handling, user
 authentication and deployment on Render.
 
 ## Quick start
@@ -127,7 +134,9 @@ curl -s -X POST localhost:3000/api/mandates -H "Content-Type: application/json" 
 curl -s -X POST localhost:3000/api/mandates/<id>/shop -H "Content-Type: application/json" -d '{}'
 ```
 
-`npm run build` followed by `npm start` runs the compiled server.
+`npm run build` followed by `npm start` runs the compiled server and serves the dashboard at
+`http://localhost:3000`. For development, `npm run dev` runs the API and `npx vite` runs the dashboard
+on port 5173 with a proxy to the API.
 
 ## API
 

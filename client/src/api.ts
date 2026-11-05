@@ -1,171 +1,85 @@
-import { AuditRecord, Mandate, Proposal, SystemHealth } from "./types";
+import { AuditRecord, Mandate, SystemHealth } from "./types";
 
-const getHeaders = (demoKey?: string) => {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (demoKey) {
-    headers["Authorization"] = `Bearer ${demoKey}`;
-  }
+const authHeaders = (demoKey?: string) => {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (demoKey) headers["Authorization"] = `Bearer ${demoKey}`;
   return headers;
 };
 
+/** Calls the backend and turns an error response into an Error with the server's message. */
+async function request<T>(path: string, fallback: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, init);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = typeof data?.error === "string" ? data.error : fallback;
+    throw new Error(message);
+  }
+  return data as T;
+}
+
+const post = (body: unknown, demoKey?: string): RequestInit => ({
+  method: "POST",
+  headers: authHeaders(demoKey),
+  body: JSON.stringify(body),
+});
+
+export interface MandateDraft extends Partial<Mandate> {}
+
 export const api = {
-  async getHealth(): Promise<SystemHealth> {
-    const res = await fetch("/api/health");
-    if (!res.ok) throw new Error("No se pudo conectar con el servidor.");
-    return res.json();
-  },
+  getHealth: () => request<SystemHealth>("/api/health", "Could not reach the server."),
 
-  async getRecords(): Promise<AuditRecord[]> {
-    const res = await fetch("/api/records");
-    if (!res.ok) throw new Error("Error al obtener registros de auditoría.");
-    return res.json();
-  },
+  getRecords: () => request<AuditRecord[]>("/api/records", "Could not load the audit records."),
 
-  async createMandate(data: Omit<Mandate, "id">): Promise<Mandate> {
-    const res = await fetch("/api/mandates", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || "Error al crear el mandato.");
-    }
-    return res.json();
-  },
+  createMandate: (data: Omit<Mandate, "id">) =>
+    request<Mandate>("/api/mandates", "Could not save the mandate.", post(data)),
 
-  async parseMandate(text: string): Promise<{ ok: boolean; mandate?: Partial<Mandate>; questions?: string[] }> {
-    const res = await fetch("/api/mandates/parse", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || "Error al interpretar mandato con IA.");
-    }
-    return data;
-  },
+  parseMandate: (text: string) =>
+    request<{ ok: boolean; draft?: MandateDraft; questions?: string[] }>(
+      "/api/mandates/parse",
+      "Could not read the mandate with the AI model.",
+      post({ text }),
+    ),
 
-  async runShop(mandateId: string, query?: string): Promise<{ run: any; record?: AuditRecord }> {
-    const res = await fetch(`/api/mandates/${mandateId}/shop`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al ejecutar el agente de compras Mandate.");
-    return data;
-  },
+  runShop: (mandateId: string, query?: string) =>
+    request<{ run: unknown; record?: AuditRecord }>(
+      `/api/mandates/${mandateId}/shop`,
+      "The shopping agent failed.",
+      post({ query }),
+    ),
 
-  async submitProposal(proposal: Omit<Proposal, "id">): Promise<AuditRecord> {
-    const res = await fetch("/api/proposals", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(proposal),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al registrar propuesta.");
-    return data;
-  },
+  confirmHuman: (id: string) =>
+    request<AuditRecord>(`/api/proposals/${id}/confirm`, "Could not confirm the proposal.", post({})),
 
-  async confirmHuman(id: string): Promise<AuditRecord> {
-    const res = await fetch(`/api/proposals/${id}/confirm`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al confirmar propuesta.");
-    return data;
-  },
+  payWithPayPal: (id: string, demoKey: string) =>
+    request<{ record: AuditRecord; approveUrl: string }>(
+      `/api/proposals/${id}/pay`,
+      "Could not create the PayPal Sandbox order.",
+      post({}, demoKey),
+    ),
 
-  async payWithPayPal(id: string, demoKey: string): Promise<{ record: AuditRecord; approveUrl: string }> {
-    const res = await fetch(`/api/proposals/${id}/pay`, {
-      method: "POST",
-      headers: getHeaders(demoKey),
-      body: JSON.stringify({}),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al generar orden de PayPal Sandbox.");
-    return data;
-  },
+  authorize: (id: string, demoKey: string) =>
+    request<AuditRecord>(`/api/proposals/${id}/authorize`, "Could not authorize the payment.", post({}, demoKey)),
 
-  async getPayPalOrder(id: string, demoKey: string): Promise<{ record: AuditRecord; order: any }> {
-    const res = await fetch(`/api/proposals/${id}/paypal`, {
-      headers: getHeaders(demoKey),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al consultar orden de PayPal.");
-    return data;
-  },
+  capture: (id: string, demoKey: string) =>
+    request<AuditRecord>(`/api/proposals/${id}/capture`, "Could not capture the payment.", post({}, demoKey)),
 
-  async authorize(id: string, demoKey: string): Promise<AuditRecord> {
-    const res = await fetch(`/api/proposals/${id}/authorize`, {
-      method: "POST",
-      headers: getHeaders(demoKey),
-      body: JSON.stringify({}),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al autorizar pago.");
-    return data;
-  },
+  voidAuth: (id: string, demoKey: string) =>
+    request<AuditRecord>(`/api/proposals/${id}/void`, "Could not void the authorization.", post({}, demoKey)),
 
-  async capture(id: string, demoKey: string): Promise<AuditRecord> {
-    const res = await fetch(`/api/proposals/${id}/capture`, {
-      method: "POST",
-      headers: getHeaders(demoKey),
-      body: JSON.stringify({}),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al capturar pago.");
-    return data;
-  },
+  reconcile: (id: string, demoKey: string) =>
+    request<AuditRecord>(`/api/proposals/${id}/reconcile`, "Could not reconcile with PayPal.", post({}, demoKey)),
 
-  async voidAuth(id: string, demoKey: string): Promise<AuditRecord> {
-    const res = await fetch(`/api/proposals/${id}/void`, {
-      method: "POST",
-      headers: getHeaders(demoKey),
-      body: JSON.stringify({}),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al anular autorización.");
-    return data;
-  },
+  demoOvercharge: (id: string, charged: number, demoKey: string) =>
+    request<AuditRecord>(
+      `/api/proposals/${id}/demo-overcharge`,
+      "Could not record the simulated overcharge.",
+      post({ charged }, demoKey),
+    ),
 
-  async reconcile(id: string, demoKey: string): Promise<AuditRecord> {
-    const res = await fetch(`/api/proposals/${id}/reconcile`, {
-      method: "POST",
-      headers: getHeaders(demoKey),
-      body: JSON.stringify({}),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al conciliar con PayPal.");
-    return data;
-  },
-
-  async demoOvercharge(id: string, charged: number, demoKey: string): Promise<AuditRecord> {
-    const res = await fetch(`/api/proposals/${id}/demo-overcharge`, {
-      method: "POST",
-      headers: getHeaders(demoKey),
-      body: JSON.stringify({ charged }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al simular sobrecargo.");
-    return data;
-  },
-
-  async refund(id: string, demoKey: string): Promise<AuditRecord> {
-    const res = await fetch(`/api/proposals/${id}/refund`, {
-      method: "POST",
-      headers: getHeaders(demoKey),
-      body: JSON.stringify({ confirm: true }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al emitir reembolso.");
-    return data;
-  },
+  refund: (id: string, demoKey: string) =>
+    request<AuditRecord>(
+      `/api/proposals/${id}/refund`,
+      "Could not issue the refund.",
+      post({ confirm: true }, demoKey),
+    ),
 };
-

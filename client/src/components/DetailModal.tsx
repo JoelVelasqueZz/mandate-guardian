@@ -69,7 +69,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   {proposal.id}
                 </span>
                 <span className="text-xs font-bold uppercase tracking-wider text-paypal-vibrant">
-                  Expediente de Auditoría
+                  Audit record
                 </span>
               </div>
               <h3 className="text-lg font-extrabold text-slate-900 line-clamp-1">
@@ -97,7 +97,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
             }`}
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>Auditoría Guardian & Reglas</span>
+            <span>Guardian review and rules</span>
           </button>
           <button
             onClick={() => setActiveTab("paypal")}
@@ -108,7 +108,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
             }`}
           >
             <CreditCard className="w-4 h-4" />
-            <span>Trazabilidad PayPal & Conciliación</span>
+            <span>PayPal and reconciliation</span>
           </button>
           <button
             onClick={() => setActiveTab("json")}
@@ -119,7 +119,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
             }`}
           >
             <span className="font-mono">{`{ }`}</span>
-            <span>JSON de Auditoría</span>
+            <span>Raw JSON</span>
           </button>
         </div>
 
@@ -131,10 +131,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-slate-500">Comercio Channel3:</span>
+                    <span className="text-xs font-bold text-slate-500">Merchant:</span>
                     <span className="text-xs font-semibold text-slate-800 flex items-center gap-1">
                       <ShoppingBag className="w-3.5 h-3.5 text-indigo-500" />
-                      {proposal.seller ?? "channel3.tech"}
+                      {proposal.seller ?? "Unknown"}
                     </span>
                     {proposal.category && (
                       <span className="text-xs text-slate-400">&bull; {proposal.category}</span>
@@ -145,7 +145,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   </div>
                   {proposal.listedPrice && (
                     <div className="text-xs text-slate-500 mt-0.5">
-                      Precio verificado en vivo de catálogo:{" "}
+                      Price the server read from the catalog:{" "}
                       <strong className="text-emerald-700">${proposal.listedPrice.toFixed(2)}</strong>
                     </div>
                   )}
@@ -158,7 +158,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                     rel="noreferrer"
                     className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:text-paypal-vibrant hover:border-paypal-vibrant transition-all flex items-center gap-2 shadow-sm"
                   >
-                    <span>Ver en Catálogo</span>
+                    <span>View listing</span>
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 )}
@@ -169,7 +169,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                 <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100">
                   <div className="flex items-center gap-2 mb-1.5 text-indigo-900 font-bold text-xs">
                     <Sparkles className="w-4 h-4 text-channel3-accent" />
-                    <span>Razonamiento del Agente Comprador (Mandate)</span>
+                    <span>Buyer agent reasoning (Mandate)</span>
                   </div>
                   <p className="text-xs text-indigo-950/80 leading-relaxed">
                     "{proposal.reasoning}"
@@ -181,7 +181,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
               {decision && (
                 <div>
                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">
-                    Evaluación de Reglas Deterministas (Guardian)
+                    Guardian rule checks
                   </h4>
                   <div className="space-y-2">
                     {decision.findings.map((f, idx) => (
@@ -206,7 +206,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                                 f.ok ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
                               }`}
                             >
-                              {f.ok ? "SUPERADA" : "FALLIDA"}
+                              {f.ok ? "PASSED" : "FAILED"}
                             </span>
                           </div>
                           <p className="text-xs text-slate-600 mt-1">{f.detail}</p>
@@ -219,7 +219,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   {decision.explanation && (
                     <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
                       <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                        Explicación Auditora (Gemini / Reglas):
+                        Guardian explanation:
                       </span>
                       <p className="text-xs font-medium text-slate-800 leading-relaxed">
                         {decision.explanation}
@@ -248,16 +248,16 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                   <div>
                     <span className="text-slate-300 block text-[11px]">PayPal Order ID:</span>
-                    <span className="font-mono font-bold">{paypal?.orderId ?? "Sin orden"}</span>
+                    <span className="font-mono font-bold">{paypal?.orderId ?? "No order yet"}</span>
                   </div>
                   <div>
                     <span className="text-slate-300 block text-[11px]">Capture ID:</span>
-                    <span className="font-mono font-bold">{paypal?.captureId ?? "Sin captura"}</span>
+                    <span className="font-mono font-bold">{paypal?.captureId ?? "No capture yet"}</span>
                   </div>
                   <div>
-                    <span className="text-slate-300 block text-[11px]">Monto Bruto Cobrado:</span>
+                    <span className="text-slate-300 block text-[11px]">Amount charged:</span>
                     <span className="font-bold text-paypal-gold text-sm">
-                      {paypal?.charged !== undefined ? `$${paypal.charged.toFixed(2)} USD` : "No cobrado"}
+                      {paypal?.charged !== undefined ? `$${paypal.charged.toFixed(2)} USD` : "Not charged"}
                     </span>
                   </div>
                 </div>
@@ -266,7 +266,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
               {/* Reconciliation Status */}
               <div className="p-5 rounded-2xl bg-white border border-slate-200">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
-                  Resultado de Conciliación Posterior al Cobro
+                  Reconciliation after payment
                 </h4>
                 {reconciliation ? (
                   <div
@@ -281,7 +281,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                     )}
                     <div>
                       <span className="font-bold text-xs text-slate-900 block mb-1">
-                        {reconciliation.match ? "Conciliación Exitosa (100% Match)" : "Alerta de Discrepancia"}
+                        {reconciliation.match ? "Reconciled: amounts match" : "Mismatch alert"}
                       </span>
                       <p className="text-xs text-slate-600">{reconciliation.detail}</p>
                       {demo?.simulated && (
@@ -293,7 +293,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   </div>
                 ) : (
                   <p className="text-xs text-slate-400">
-                    Aún no se ha ejecutado la conciliación sobre esta transacción.
+                    This payment has not been reconciled yet.
                   </p>
                 )}
               </div>
@@ -302,7 +302,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
               {paypal?.approveUrl && (
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
                   <div className="text-xs text-slate-700">
-                    <span className="font-bold block">Enlace de Aprobación del Comprador Sandbox:</span>
+                    <span className="font-bold block">Sandbox buyer approval link:</span>
                     <span className="font-mono text-[11px] text-slate-500 truncate max-w-md block">
                       {paypal.approveUrl}
                     </span>
@@ -313,7 +313,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                     rel="noreferrer"
                     className="px-4 py-2 rounded-xl bg-paypal-gold hover:bg-paypal-goldHover text-paypal-navy font-bold text-xs shadow-sm transition-all shrink-0 flex items-center gap-1.5"
                   >
-                    <span>Abrir Checkout</span>
+                    <span>Open checkout</span>
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 </div>
@@ -328,7 +328,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                 className="absolute right-3 top-3 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? "Copiado" : "Copiar JSON"}</span>
+                <span>{copied ? "Copied" : "Copy JSON"}</span>
               </button>
               <pre className="p-4 rounded-2xl bg-slate-900 text-slate-200 text-xs font-mono overflow-x-auto max-h-[400px]">
                 {JSON.stringify(record, null, 2)}
@@ -340,7 +340,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
         {/* Modal Footer / Contextual Action Bar */}
         <div className="p-5 border-t border-slate-100 bg-slate-50 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">Estado actual:</span>
+            <span className="text-xs text-slate-500">Current status:</span>
             <span className="font-bold text-xs text-slate-800 uppercase tracking-wide">
               {status}
             </span>
@@ -355,7 +355,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                 }}
                 className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all"
               >
-                Aprobar como Humano
+                Approve as a human
               </button>
             )}
 
@@ -367,20 +367,31 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                 }}
                 className="px-4 py-2 rounded-xl bg-paypal-gold hover:bg-paypal-goldHover text-paypal-navy font-black text-xs shadow-sm transition-all"
               >
-                Pagar con PayPal Sandbox
+                Pay with PayPal Sandbox
               </button>
             )}
 
             {status === "awaiting_paypal" && (
-              <button
-                onClick={() => {
-                  onCapture(proposal.id);
-                  onClose();
-                }}
-                className="px-4 py-2 rounded-xl bg-paypal-vibrant hover:bg-paypal-blue text-white font-bold text-xs shadow-sm transition-all"
-              >
-                Capturar Orden
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    onAuthorize(proposal.id);
+                    onClose();
+                  }}
+                  className="px-4 py-2 rounded-xl bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs shadow-sm transition-all"
+                >
+                  Authorize order (Plan A)
+                </button>
+                <button
+                  onClick={() => {
+                    onCapture(proposal.id);
+                    onClose();
+                  }}
+                  className="px-4 py-2 rounded-xl bg-paypal-vibrant hover:bg-paypal-blue text-white font-bold text-xs shadow-sm transition-all"
+                >
+                  Capture order (Plan B)
+                </button>
+              </>
             )}
 
             {status === "authorized" && (
@@ -392,7 +403,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   }}
                   className="px-4 py-2 rounded-xl bg-paypal-vibrant hover:bg-paypal-blue text-white font-bold text-xs shadow-sm transition-all"
                 >
-                  Capturar Fondos
+                  Capture funds
                 </button>
                 <button
                   onClick={() => {
@@ -401,7 +412,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   }}
                   className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs transition-all"
                 >
-                  Anular Autorización
+                  Void authorization
                 </button>
               </>
             )}
@@ -415,7 +426,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   }}
                   className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all"
                 >
-                  Reconciliar Captura
+                  Reconcile capture
                 </button>
                 <button
                   onClick={() => {
@@ -424,7 +435,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   }}
                   className="px-4 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs transition-all"
                 >
-                  Simular Sobrecargo
+                  Simulate overcharge
                 </button>
               </>
             )}
@@ -438,7 +449,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1.5"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Emitir Reembolso Completo</span>
+                <span>Issue full refund</span>
               </button>
             )}
 
@@ -446,7 +457,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({
               onClick={onClose}
               className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-colors"
             >
-              Cerrar
+              Close
             </button>
           </div>
         </div>

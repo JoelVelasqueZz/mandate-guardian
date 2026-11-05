@@ -1,26 +1,20 @@
 import React from "react";
-import { ShieldCheck, ShoppingBag, Database, Cpu, Key, RefreshCw, Sparkles, CheckCircle2 } from "lucide-react";
+import { ShieldCheck, ShoppingBag, Database, Key, RefreshCw, Sparkles } from "lucide-react";
 import { SystemHealth } from "../types";
 
 interface NavbarProps {
-  isMockMode: boolean;
-  setIsMockMode: (val: boolean) => void;
   systemHealth: SystemHealth | null;
   demoKey: string;
   onOpenSettings: () => void;
   onRefresh: () => void;
-  onResetMocks: () => void;
   loading: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  isMockMode,
-  setIsMockMode,
   systemHealth,
   demoKey,
   onOpenSettings,
   onRefresh,
-  onResetMocks,
   loading,
 }) => {
   return (
@@ -48,99 +42,61 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-600 font-semibold">
-              Trust Layer & Auditor Independiente para Agentes de Compras AI
+              Trust layer and independent auditor for AI shopping agents
             </p>
           </div>
         </div>
 
         {/* System telemetry badges */}
-        <nav aria-label="Estado del sistema" className="hidden xl:flex items-center gap-2">
+        <nav aria-label="System status" className="hidden xl:flex items-center gap-2">
           {/* Catalog indicator */}
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 border border-slate-300 text-slate-800">
             <Database className="w-3.5 h-3.5 text-slate-600" aria-hidden="true" />
-            <span>Catálogo:</span>
+            <span>Catalog:</span>
             <span className={`font-bold ${systemHealth?.catalog === "channel3" ? "text-emerald-800" : "text-amber-900"}`}>
-              {systemHealth?.catalog === "channel3" ? "Channel3 Live" : "Demo Labeled"}
+              {systemHealth?.catalog === "channel3" ? "Channel3 (live)" : "Offline demo catalog"}
             </span>
           </div>
 
           {/* AI model indicator */}
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 border border-slate-300 text-slate-800">
             <Sparkles className="w-3.5 h-3.5 text-indigo-700" aria-hidden="true" />
-            <span>Auditor IA:</span>
+            <span>AI reviewer:</span>
             <span className={`font-bold ${systemHealth?.ai ? "text-indigo-900" : "text-slate-700"}`}>
-              {systemHealth?.ai ? "Gemini 3 Flash" : "Reglas Deterministas"}
+              {systemHealth?.ai ? "Model enabled" : "Rules only"}
             </span>
           </div>
 
           {/* PayPal Demo Key Status */}
           <button
             onClick={onOpenSettings}
-            aria-label="Abrir configuración de DEMO_API_KEY para pagos PayPal Sandbox"
+            aria-label="Open settings for the demo key used by payment actions"
             className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
               demoKey
                 ? "bg-emerald-100 border-emerald-300 text-emerald-950 hover:bg-emerald-200"
                 : "bg-amber-100 border-amber-300 text-amber-950 hover:bg-amber-200"
             }`}
-            title="Configurar Demo API Key para endpoints de pago"
+            title="Set the demo key for payment actions"
           >
             <Key className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Demo Key:</span>
-            <span className="font-bold">{demoKey ? "Activa" : "Configurar"}</span>
+            <span className="font-bold">{demoKey ? "Set" : "Not set"}</span>
           </button>
         </nav>
 
-        {/* Right side controls: Mock switch & Refresh */}
+        {/* Right side controls */}
         <div className="flex items-center gap-3">
-          {/* Data source switch */}
-          <div className="flex items-center bg-slate-200/80 p-1 rounded-xl border border-slate-300 text-xs font-bold" role="group" aria-label="Selección de origen de datos">
-            <button
-              onClick={() => setIsMockMode(true)}
-              aria-pressed={isMockMode}
-              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                isMockMode
-                  ? "bg-white text-paypal-navy shadow-sm border border-slate-300 font-bold"
-                  : "text-slate-700 hover:text-slate-950"
-              }`}
-            >
-              <CheckCircle2 className={`w-3.5 h-3.5 ${isMockMode ? "text-paypal-vibrant" : "text-transparent"}`} aria-hidden="true" />
-              <span>Datos Falsos (Mock)</span>
-            </button>
-            <button
-              onClick={() => setIsMockMode(false)}
-              aria-pressed={!isMockMode}
-              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
-                !isMockMode
-                  ? "bg-paypal-vibrant text-white shadow-sm font-bold"
-                  : "text-slate-700 hover:text-slate-950"
-              }`}
-            >
-              <Cpu className="w-3.5 h-3.5" aria-hidden="true" />
-              <span>API Backend</span>
-            </button>
-          </div>
-
           {/* Refresh action */}
           <button
             onClick={onRefresh}
             disabled={loading}
-            aria-label="Refrescar datos de la tabla y estado del sistema"
+            aria-label="Refresh the table and system status"
             className="p-2 rounded-xl text-slate-700 hover:text-slate-950 hover:bg-slate-100 border border-slate-300 transition-colors disabled:opacity-50"
-            title="Refrescar datos"
+            title="Refresh data"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-paypal-vibrant" : ""}`} />
           </button>
 
-          {/* Reset mocks if in mock mode */}
-          {isMockMode && (
-            <button
-              onClick={onResetMocks}
-              aria-label="Restablecer datos falsos a los valores iniciales"
-              className="text-xs text-slate-700 hover:text-paypal-vibrant font-bold underline underline-offset-2 hidden sm:inline"
-            >
-              Restablecer Falsos
-            </button>
-          )}
         </div>
       </div>
     </header>

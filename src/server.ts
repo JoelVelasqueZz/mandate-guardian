@@ -14,7 +14,6 @@ import { runMandate } from "./mandate/agent.js";
 import { parseMandateText } from "./mandate/parse-mandate.js";
 import { Store } from "./store.js";
 import { createPayPalRouter } from "./paypal/routes.js";
-import { seedDemoData } from "./seed.js";
 
 const app = express();
 app.use(compression());
@@ -29,9 +28,6 @@ app.use((_req, res, next) => {
   next();
 });
 const store = new Store();
-if (process.env.NODE_ENV !== "test") {
-  seedDemoData(store);
-}
 const aiReviewer = aiReviewerFromEnv(); // undefined unless AI_API_KEY and AI_MODEL are set
 const llm = llmFromEnv(); // same model, used by the buyer agent
 const catalog: Catalog = catalogFromEnv(); // live Channel3 with CHANNEL3_API_KEY, labeled demo data otherwise
@@ -116,49 +112,11 @@ app.use(createPayPalRouter(store));
 // Feed for the AG Grid dashboard.
 app.get("/api/records", (_req, res) => res.json([...store.records.values()]));
 
-// Serve static frontend build and Agentic/SEO endpoints
+// Serve the built dashboard (npm run build) when it exists
 const clientDist = path.resolve(process.cwd(), "dist/client");
 
 app.get("/robots.txt", (_req, res) => {
   res.type("text/plain").send("User-agent: *\nAllow: /\n");
-});
-
-app.get("/llms.txt", (_req, res) => {
-  const filePath = path.join(clientDist, "llms.txt");
-  if (fs.existsSync(filePath)) {
-    return res.type("text/markdown; charset=utf-8").sendFile(filePath);
-  }
-  res.type("text/markdown; charset=utf-8").send("# Mandate & Guardian\n\n> Trust Layer for AI Shopping Agents.\n\n- [API](/api/health): Health endpoint\n- [Records](/api/records): Audit records\n");
-});
-
-app.get(["/ai-catalog.json", "/.well-known/ai-catalog.json"], (_req, res) => {
-  const filePath = path.join(clientDist, "ai-catalog.json");
-  if (fs.existsSync(filePath)) {
-    return res.type("application/json").sendFile(filePath);
-  }
-  res.json({
-    specVersion: "1.0",
-    host: {
-      displayName: "Mandate & Guardian",
-      identifier: "http://localhost:3001",
-    },
-    entries: [
-      {
-        identifier: "urn:air:mandateguardian.local:agent:guardian-auditor",
-        displayName: "Guardian Auditor Agent",
-        type: "application/a2a-agent-card+json",
-        description: "Deterministic safety rules engine auditing purchase proposals before payment execution",
-        url: "http://localhost:3001/api/records",
-      },
-      {
-        identifier: "urn:air:mandateguardian.local:agent:mandate-buyer",
-        displayName: "Mandate Buyer Agent",
-        type: "application/a2a-agent-card+json",
-        description: "Catalog search and offer evaluation agent connecting to Channel3",
-        url: "http://localhost:3001/api/mandates",
-      },
-    ],
-  });
 });
 
 if (fs.existsSync(clientDist)) {
@@ -183,12 +141,10 @@ if (fs.existsSync(clientDist)) {
 const port = Number(process.env.PORT ?? 3000);
 if (process.env.NODE_ENV !== "test") {
   const server = app.listen(port, "0.0.0.0", () => console.log(`Mandate & Guardian on http://localhost:${port}`));
-  server.on("error", (err: any) => {
-    if (err.code === "EACCES") {
-      const fallbackPort = port === 3000 ? 3001 : port + 1;
-      console.warn(`Puerto ${port} restringido (EACCES), iniciando en http://localhost:${fallbackPort}...`);
-      app.listen(fallbackPort, "0.0.0.0", () => console.log(`Mandate & Guardian on http://localhost:${fallbackPort}`));
-    }
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    // No silent fallback to another port: APP_BASE_URL (PayPal return pages) must match the real port.
+    console.error(`Could not listen on port ${port} (${err.code ?? err.message}). Set PORT and APP_BASE_URL to a free port and retry.`);
+    process.exit(1);
   });
 }
 
