@@ -16,8 +16,9 @@ then reconciles what was charged and recommends a refund when something doesn't 
    labeled offline demo catalog.
 3. Open the row and the **Receipt and trail** tab: the signed receipt (press **Verify signature**) and the
    hash-chained timeline.
-4. Press **Red team** to throw 12 hostile proposals at the Guardian (forged prices, prompt injection,
-   salami slicing) and see what it did with each.
+4. Press **Red team** to throw 12 hostile proposals and 8 attacks on the evidence at the Guardian (forged
+   prices, prompt injection, salami slicing, an edited receipt, a rewritten audit log) and see what it did
+   with each. Open **Audit log** for the chained events.
 5. To pay, you need a PayPal Sandbox buyer account and the server's demo key; see
    [docs/PAYPAL-TESTING.md](docs/PAYPAL-TESTING.md).
 
