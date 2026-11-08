@@ -289,9 +289,23 @@ export const MandateSection: React.FC<MandateSectionProps> = ({
 
               {/* Structured Form */}
               <form onSubmit={handleCreate} className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm">
-                <span className="text-xs font-bold text-slate-900 block mb-3">
-                  Mandate rules (enforced by code)
-                </span>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-bold text-slate-900">Mandate rules (enforced by code)</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGoal("a birthday gift for my mom");
+                      setMaxPerPurchase(40);
+                      setMaxMonthly(100);
+                      setRequireHumanAbove("");
+                      setCategories("");
+                      setDeliverBy("");
+                    }}
+                    className="text-[11px] font-bold text-paypal-vibrant hover:underline"
+                  >
+                    Fill with the example
+                  </button>
+                </div>
 
                 <div className="space-y-3">
                   <div>

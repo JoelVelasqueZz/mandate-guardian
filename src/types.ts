@@ -36,6 +36,8 @@ export interface Finding {
   rule: string;
   ok: boolean;
   detail: string;
+  /** For a failed rule: what would have to change for it to pass. Deterministic text, never from a model. */
+  hint?: string;
 }
 
 export interface Decision {
@@ -44,6 +46,26 @@ export interface Decision {
   findings: Finding[];
   /** Plain-language explanation shown to the user (filled by the AI layer, with a deterministic fallback). */
   explanation: string;
+}
+
+/** Signed proof that the Guardian approved exactly this purchase. Verified before any PayPal order is created. */
+export interface Receipt {
+  payload: {
+    v: 1;
+    proposalId: string;
+    mandateId: string;
+    mandateHash: string;
+    productId?: string;
+    title: string;
+    price: number;
+    currency: string;
+    verdict: "approve" | "approve_after_human";
+    findingsHash: string;
+    issuedAt: string;
+  };
+  /** Ed25519 signature over the canonical payload, base64. */
+  signature: string;
+  keyId: string;
 }
 
 export type PaymentStatus =
@@ -65,6 +87,7 @@ export type PaymentStatus =
 export interface AuditRecord {
   proposal: Proposal;
   decision?: Decision;
+  receipt?: Receipt;
   status: PaymentStatus;
   paypal?: {
     orderId?: string;

@@ -237,6 +237,8 @@ export const AuditGrid: React.FC<AuditGridProps> = ({
           if (!d) return <span className="text-slate-500 text-xs">Not reviewed</span>;
           const passedRules = d.findings.filter((f) => f.ok).length;
           const totalRules = d.findings.length;
+          // The Guardian asked a person and the person said yes: show that, not the original question.
+          const humanApproved = d.verdict === "ask_human" && !["awaiting_human", "blocked"].includes(params.data?.status ?? "");
           return (
             <div className="flex flex-col justify-center py-1">
               <div className="flex items-center gap-1.5">
@@ -252,7 +254,7 @@ export const AuditGrid: React.FC<AuditGridProps> = ({
                 )}
                 {d.verdict === "ask_human" && (
                   <span className="flex items-center gap-1 text-amber-900 font-bold text-xs">
-                    <ShieldAlert className="w-3.5 h-3.5" /> Ask a human
+                    <ShieldAlert className="w-3.5 h-3.5" /> {humanApproved ? "Human approved" : "Ask a human"}
                   </span>
                 )}
                 <span className="text-[11px] text-slate-600 font-bold">

@@ -13,11 +13,17 @@ import {
   Sparkles,
   ShoppingBag,
   RotateCcw,
+  Download,
+  Link2,
+  Lightbulb,
 } from "lucide-react";
-import { AuditRecord } from "../types";
+import { AuditEvent, AuditRecord, Receipt } from "../types";
 
 interface DetailModalProps {
   record: AuditRecord | null;
+  events: AuditEvent[];
+  onDownloadEvidence: (id: string) => void;
+  onVerifyReceipt: (receipt: Receipt) => Promise<boolean>;
   onClose: () => void;
   onConfirmHuman: (id: string) => void;
   onPayWithPayPal: (id: string) => void;
@@ -31,6 +37,9 @@ interface DetailModalProps {
 
 export const DetailModal: React.FC<DetailModalProps> = ({
   record,
+  events,
+  onDownloadEvidence,
+  onVerifyReceipt,
   onClose,
   onConfirmHuman,
   onPayWithPayPal,
@@ -42,7 +51,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({
   onRefund,
 }) => {
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"audit" | "paypal" | "json">("audit");
+  const [activeTab, setActiveTab] = useState<"audit" | "paypal" | "trail" | "json">("audit");
+  const [receiptCheck, setReceiptCheck] = useState<"idle" | "checking" | "valid" | "invalid">("idle");
 
   if (!record) return null;
 
@@ -109,6 +119,17 @@ export const DetailModal: React.FC<DetailModalProps> = ({
           >
             <CreditCard className="w-4 h-4" />
             <span>PayPal and reconciliation</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("trail")}
+            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+              activeTab === "trail"
+                ? "border-paypal-vibrant text-paypal-vibrant"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <Link2 className="w-4 h-4" />
+            <span>Receipt and trail</span>
           </button>
           <button
             onClick={() => setActiveTab("json")}
@@ -210,6 +231,12 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                             </span>
                           </div>
                           <p className="text-xs text-slate-600 mt-1">{f.detail}</p>
+                          {!f.ok && f.hint && (
+                            <p className="text-xs text-rose-900 mt-1.5 flex items-start gap-1.5 font-medium">
+                              <Lightbulb className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                              <span>To pass: {f.hint}</span>
+                            </p>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -318,6 +345,83 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                   </a>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === "trail" && (
+            <div className="space-y-6">
+              <div className="p-5 rounded-2xl bg-white border border-slate-200">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Guardian receipt</h4>
+                {record.receipt ? (
+                  <div className="space-y-3 text-xs text-slate-700">
+                    <p>
+                      The Guardian signed this approval ({record.receipt.payload.verdict === "approve_after_human" ? "after a human confirmed it" : "on its own"}) for{" "}
+                      <strong>${record.receipt.payload.price.toFixed(2)} {record.receipt.payload.currency}</strong>. PayPal can only be
+                      asked to charge a proposal that still matches this receipt.
+                    </p>
+                    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 font-mono text-[11px]">
+                      <div><dt className="text-slate-500 font-sans">Key</dt><dd>{record.receipt.keyId}</dd></div>
+                      <div><dt className="text-slate-500 font-sans">Issued</dt><dd>{record.receipt.payload.issuedAt}</dd></div>
+                      <div className="sm:col-span-2"><dt className="text-slate-500 font-sans">Signature (Ed25519)</dt><dd className="break-all">{record.receipt.signature.slice(0, 64)}...</dd></div>
+                    </dl>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={async () => {
+                          setReceiptCheck("checking");
+                          try {
+                            setReceiptCheck((await onVerifyReceipt(record.receipt!)) ? "valid" : "invalid");
+                          } catch {
+                            setReceiptCheck("invalid");
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-paypal-navy hover:bg-slate-900 text-white text-xs font-bold"
+                      >
+                        {receiptCheck === "checking" ? "Checking..." : "Verify signature"}
+                      </button>
+                      {receiptCheck === "valid" && <span role="status" className="text-xs font-bold text-emerald-800">Signature is valid</span>}
+                      {receiptCheck === "invalid" && <span role="status" className="text-xs font-bold text-rose-800">Signature is NOT valid</span>}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-600">
+                    No receipt. The Guardian has not approved this proposal, so the payment route will refuse to create a PayPal order for it.
+                  </p>
+                )}
+              </div>
+
+              <div className="p-5 rounded-2xl bg-white border border-slate-200">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Hash-chained timeline</h4>
+                  <button
+                    onClick={() => onDownloadEvidence(proposal.id)}
+                    className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:border-paypal-vibrant text-xs font-bold text-slate-800 flex items-center gap-1.5"
+                    title="Download the decision, the receipt, the PayPal IDs and this timeline as Markdown (needs the demo key)"
+                  >
+                    <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Download evidence</span>
+                  </button>
+                </div>
+                {events.length === 0 ? (
+                  <p className="text-xs text-slate-600">No events yet.</p>
+                ) : (
+                  <ol className="space-y-2">
+                    {events.map((e) => (
+                      <li key={e.seq} className="text-xs flex items-start gap-3">
+                        <span className="font-mono text-[11px] text-slate-500 w-8 shrink-0">#{e.seq}</span>
+                        <div className="flex-1">
+                          <div className="font-bold text-slate-900">{e.type}</div>
+                          <div className="text-slate-600">{e.detail}</div>
+                          <div className="font-mono text-[10px] text-slate-400">{e.at} &middot; {e.hash.slice(0, 16)}</div>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                <p className="text-[11px] text-slate-500 mt-3">
+                  Each event carries the hash of the one before it. Changing or deleting any event breaks every hash after it, and
+                  the "Audit chain" badge in the header turns red.
+                </p>
+              </div>
             </div>
           )}
 
