@@ -96,7 +96,20 @@ flowchart LR
   human-confirmation threshold, and a control that must be approved) go through the same Guardian code
   the API uses, on an isolated store and an offline test catalog. Real records are never touched. With
   an AI model configured, the two injection scenarios can also be shown to the reviewer. Covered by
-  tests, including a reviewer that tries to approve everything.
+  tests, including a reviewer that tries to approve everything. Eight more attacks target the evidence
+  itself: editing a signed receipt, lowering the price after approval, paying with no receipt, a receipt
+  signed by another key, loosening the mandate afterwards, and rewriting, deleting or reordering events in
+  the audit log. Each is caught by the same checks the payment route and the log verifier use, and the
+  window says what was caught (for example "Chain broken at event #2").
+- **Alternatives for a blocked purchase** (`src/guardian/alternatives.ts`): when the Guardian blocks a
+  proposal, the detail window can search the same Channel3 catalog for in-stock products that fit the
+  mandate (under the per-purchase cap and under what is left of the month, in the mandate currency), with
+  photos. "Propose this instead" builds a new proposal from catalog data only and sends it through the
+  Guardian again, so the replacement gets the same rules, price check and signed receipt as any purchase.
+  Routes: `GET /api/proposals/:id/alternatives` and `POST /api/proposals/:id/swap` (blocked proposals only).
+- **Audit log table** (AG Grid): the "Audit log" window lists every chained event with its hash and what it
+  links to, with filters, search, CSV export, a live total row and a flash on new events. It uses AG Grid
+  Community only.
 - **Fix hints and evidence packet:** a failed rule says what would have to change for it to pass
   (deterministic text, not from a model). `GET /api/proposals/:id/evidence?format=md` (demo key)
   returns the decision, receipt, PayPal IDs, reconciliation and the hash-chained timeline for one
@@ -208,6 +221,8 @@ authentication; this is a single-user demo API.
 | POST | `/api/mandates/:id/shop` | none | Mandate searches the catalog and proposes; the Guardian reviews the proposal |
 | POST | `/api/proposals` | none | Submit a purchase proposal; the Guardian reviews it |
 | POST | `/api/proposals/:id/confirm` | demo key | A human confirms a proposal the Guardian flagged |
+| GET | `/api/proposals/:id/alternatives` | none | Products from the catalog that fit the mandate (blocked proposals only) |
+| POST | `/api/proposals/:id/swap` | none | Send one of those products back through the Guardian as a new proposal |
 | GET | `/api/guardian/public-key` | none | Public key that verifies the Guardian's receipts |
 | GET | `/api/proposals/:id/receipt` | none | The Guardian's signed receipt for an approved proposal |
 | POST | `/api/receipts/verify` | none | Check a receipt's signature |

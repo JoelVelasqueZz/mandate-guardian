@@ -17,13 +17,15 @@ import {
   Link2,
   Lightbulb,
 } from "lucide-react";
-import { AuditEvent, AuditRecord, Receipt } from "../types";
+import { AlternativesResponse, AuditEvent, AuditRecord, Receipt } from "../types";
 
 interface DetailModalProps {
   record: AuditRecord | null;
   events: AuditEvent[];
   onDownloadEvidence: (id: string) => void;
   onVerifyReceipt: (receipt: Receipt) => Promise<boolean>;
+  onFindAlternatives: (id: string) => Promise<AlternativesResponse>;
+  onSwap: (id: string, productId: string) => void;
   onClose: () => void;
   onConfirmHuman: (id: string) => void;
   onPayWithPayPal: (id: string) => void;
@@ -40,6 +42,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({
   events,
   onDownloadEvidence,
   onVerifyReceipt,
+  onFindAlternatives,
+  onSwap,
   onClose,
   onConfirmHuman,
   onPayWithPayPal,
@@ -52,6 +56,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<"audit" | "paypal" | "trail" | "json">("audit");
+  const [alts, setAlts] = useState<AlternativesResponse | null>(null);
+  const [altsState, setAltsState] = useState<"idle" | "loading" | "error">("idle");
   const [receiptCheck, setReceiptCheck] = useState<"idle" | "checking" | "valid" | "invalid">("idle");
 
   if (!record) return null;
@@ -241,6 +247,75 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                       </div>
                     ))}
                   </div>
+
+                  {status === "blocked" && (
+                    <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider">
+                          Instead, products that fit your rules
+                        </span>
+                        <button
+                          onClick={async () => {
+                            setAltsState("loading");
+                            try {
+                              setAlts(await onFindAlternatives(proposal.id));
+                              setAltsState("idle");
+                            } catch {
+                              setAltsState("error");
+                            }
+                          }}
+                          disabled={altsState === "loading"}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold disabled:opacity-60"
+                        >
+                          {altsState === "loading" ? "Searching..." : alts ? "Search again" : "Find alternatives"}
+                        </button>
+                      </div>
+                      {altsState === "error" && (
+                        <p role="alert" className="text-xs text-rose-800 font-semibold mt-2">The catalog could not be searched. Try again.</p>
+                      )}
+                      {alts && alts.alternatives.length === 0 && (
+                        <p className="text-xs text-slate-700 mt-2">
+                          Nothing in stock fits at or below {alts.maxPrice.toFixed(2)}. Raising the caps in the mandate would be the next step.
+                        </p>
+                      )}
+                      {alts && alts.alternatives.length > 0 && (
+                        <ul className="mt-3 space-y-2">
+                          {alts.alternatives.map((a) => (
+                            <li key={a.productId} className="flex items-center gap-3 bg-white rounded-xl border border-emerald-200 p-2.5">
+                              {a.imageUrl ? (
+                                <img
+                                  src={a.imageUrl}
+                                  alt=""
+                                  loading="lazy"
+                                  referrerPolicy="no-referrer"
+                                  onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+                                  className="w-12 h-12 rounded-lg object-cover bg-slate-100 shrink-0"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center shrink-0" aria-hidden="true">
+                                  <ShoppingBag className="w-5 h-5 text-slate-400" />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-bold text-slate-900 line-clamp-2">{a.title}</div>
+                                <div className="text-[11px] text-slate-600">
+                                  {a.merchant ?? "Unknown merchant"} &middot; <strong className="text-slate-900">${a.price.toFixed(2)} {a.currency}</strong>
+                                  {alts.source === "demo" ? " (demo catalog)" : ""}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => onSwap(proposal.id, a.productId)}
+                                className="px-3 py-1.5 rounded-lg bg-paypal-vibrant hover:bg-paypal-blue text-white text-[11px] font-bold shrink-0"
+                                title="Send this product through the Guardian as a new proposal"
+                              >
+                                Propose this instead
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
 
                   {/* AI Reviewer Summary */}
                   {decision.explanation && (

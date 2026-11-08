@@ -9,6 +9,7 @@ import { aiReviewerFromEnv } from "./guardian/ai-reviewer.js";
 import { reviewAndStore } from "./guardian/submit.js";
 import { signerFromEnv } from "./guardian/receipt.js";
 import { runRedTeam } from "./redteam.js";
+import { findAlternatives, proposalFromHit } from "./guardian/alternatives.js";
 import { rateLimit } from "./ratelimit.js";
 import { buildEvidence, evidenceMarkdown } from "./evidence.js";
 import { llmFromEnv } from "./guardian/llm.js";
@@ -97,6 +98,43 @@ app.post("/api/mandates/:id/shop", limitShop, async (req, res) => {
   }
 });
 
+// 2c. A blocked proposal: real products from the same catalog that DO fit the mandate, and a way to
+// send one of them back through the Guardian. Only catalog data goes into the new proposal.
+app.get("/api/proposals/:id/alternatives", limitShop, async (req, res) => {
+  const record = store.records.get(req.params.id);
+  if (!record) return res.status(404).json({ error: "Proposal not found." });
+  if (record.status !== "blocked") return res.status(409).json({ error: "Alternatives are offered only for blocked proposals." });
+  const mandate = store.mandates.get(record.proposal.mandateId);
+  if (!mandate) return res.status(404).json({ error: "mandate not found" });
+  try {
+    res.json({
+      source: catalog.source,
+      ...(await findAlternatives(catalog, mandate, record.proposal, store.spentThisMonth(mandate.id))),
+    });
+  } catch (e) {
+    res.status(502).json({ error: `The catalog could not be searched: ${e instanceof Error ? e.message : String(e)}` });
+  }
+});
+
+app.post("/api/proposals/:id/swap", limitShop, async (req, res) => {
+  const record = store.records.get(req.params.id);
+  if (!record) return res.status(404).json({ error: "Proposal not found." });
+  if (record.status !== "blocked") return res.status(409).json({ error: "Only a blocked proposal can be replaced." });
+  const mandate = store.mandates.get(record.proposal.mandateId);
+  if (!mandate) return res.status(404).json({ error: "mandate not found" });
+  const productId = typeof req.body?.productId === "string" ? req.body.productId : "";
+  if (!productId) return res.status(400).json({ error: "productId is required" });
+  let hit;
+  try {
+    hit = await catalog.getProduct(productId);
+  } catch {
+    return res.status(502).json({ error: "The catalog could not be reached." });
+  }
+  if (!hit || !hit.inStock) return res.status(404).json({ error: "That product is not available in the catalog." });
+  const proposal = ProposalSchema.parse({ ...proposalFromHit(mandate, hit, record.proposal), id: randomUUID() });
+  res.status(201).json(await submitProposal(mandate, proposal));
+});
+
 // PayPal sandbox flows, callbacks and reconciliation.
 app.use(createPayPalRouter(store, {
   verifyApproval: (record) => signer.checkRecord(record, store.mandates.get(record.proposal.mandateId)),
@@ -167,13 +205,18 @@ if (fs.existsSync(clientDist)) {
       maxAge: "1d",
       setHeaders: (res, filePath) => {
         if (filePath.includes("assets")) {
+          // Hashed file names never change, so they can be cached for good.
           res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else if (filePath.endsWith("index.html")) {
+          // The page that names those files must be revalidated, or a redeploy leaves visitors with a broken page.
+          res.setHeader("Cache-Control", "no-cache");
         }
       },
     })
   );
   app.get("*", (req, res, next) => {
     if (req.path.startsWith("/api") || req.path.startsWith("/paypal")) return next();
+    res.setHeader("Cache-Control", "no-cache");
     res.sendFile(path.join(clientDist, "index.html"), (err) => {
       if (err) next();
     });

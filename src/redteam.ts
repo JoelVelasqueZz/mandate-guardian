@@ -3,6 +3,7 @@ import { DEMO_PRODUCTS, DemoCatalog, type ProductHit } from "./channel3/client.j
 import type { AiReviewer } from "./guardian/guardian.js";
 import { reviewAndStore } from "./guardian/submit.js";
 import { Store } from "./store.js";
+import { runIntegrityChecks, type IntegrityResult } from "./redteam-integrity.js";
 import type { Mandate, Proposal, Verdict } from "./types.js";
 
 export interface RedTeamResult {
@@ -27,6 +28,9 @@ export interface RedTeamReport {
   catalog: "offline test catalog";
   aiUsed: boolean;
   results: RedTeamResult[];
+  /** Attacks on the evidence itself: edited receipts, a rewritten audit log. */
+  integrity: IntegrityResult[];
+  /** Counts cover the purchase scenarios and the integrity attacks together. */
   held: number;
   total: number;
 }
@@ -207,13 +211,16 @@ export async function runRedTeam(options: { ai?: AiReviewer; now?: () => Date } 
     });
   }
 
+  const integrity = runIntegrityChecks();
+
   return {
     startedAt: (options.now ?? (() => new Date()))().toISOString(),
     isolated: true,
     catalog: "offline test catalog",
     aiUsed: Boolean(options.ai),
     results,
-    held: results.filter((r) => r.held).length,
-    total: results.length,
+    integrity,
+    held: results.filter((r) => r.held).length + integrity.filter((r) => r.held).length,
+    total: results.length + integrity.length,
   };
 }

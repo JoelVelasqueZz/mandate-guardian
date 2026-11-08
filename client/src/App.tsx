@@ -11,6 +11,7 @@ import { CheckCircle2, AlertCircle, Info, X } from "lucide-react";
 // Lazy load modals to keep the initial JavaScript payload small
 const DetailModal = lazy(() => import("./components/DetailModal").then((m) => ({ default: m.DetailModal })));
 const RedTeamModal = lazy(() => import("./components/RedTeamModal").then((m) => ({ default: m.RedTeamModal })));
+const AuditLogModal = lazy(() => import("./components/AuditLogModal").then((m) => ({ default: m.AuditLogModal })));
 const SettingsModal = lazy(() => import("./components/SettingsModal").then((m) => ({ default: m.SettingsModal })));
 
 const DEMO_KEY_STORAGE = "mg_demo_key";
@@ -34,6 +35,7 @@ export const App: React.FC = () => {
   const [chain, setChain] = useState<ChainCheck | null>(null);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [isRedTeamOpen, setIsRedTeamOpen] = useState(false);
+  const [isAuditLogOpen, setIsAuditLogOpen] = useState(false);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -218,6 +220,19 @@ export const App: React.FC = () => {
     });
   };
 
+  const handleSwap = (id: string, productId: string) =>
+    act(async () => {
+      const record = await api.swapProposal(id, productId);
+      setRecords((prev) => [record, ...prev]);
+      setSelectedId(record.proposal.id);
+      showToast(
+        record.status === "approved" ? "success" : "info",
+        record.status === "approved"
+          ? "The alternative passed the Guardian and is approved."
+          : `The Guardian reviewed the alternative: ${record.status.replace("_", " ")}.`,
+      );
+    });
+
   const handleDownloadEvidence = async (id: string) => {
     if (needsKey()) return;
     try {
@@ -312,6 +327,7 @@ export const App: React.FC = () => {
         systemHealth={systemHealth}
         chain={chain}
         onOpenRedTeam={() => setIsRedTeamOpen(true)}
+        onOpenAuditLog={() => setIsAuditLogOpen(true)}
         demoKey={demoKey}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onRefresh={() => refresh()}
@@ -377,6 +393,8 @@ export const App: React.FC = () => {
             record={selectedRecord}
             events={events.filter((e) => e.proposalId === selectedRecord.proposal.id)}
             onDownloadEvidence={handleDownloadEvidence}
+            onFindAlternatives={(id) => api.getAlternatives(id)}
+            onSwap={handleSwap}
             onVerifyReceipt={async (receipt) => (await api.verifyReceipt(receipt)).valid}
             onClose={() => setSelectedId(null)}
             onConfirmHuman={handleConfirmHuman}
@@ -387,6 +405,18 @@ export const App: React.FC = () => {
             onReconcile={handleReconcile}
             onDemoOvercharge={handleDemoOvercharge}
             onRefund={handleRefund}
+          />
+        )}
+
+        {isAuditLogOpen && (
+          <AuditLogModal
+            events={events}
+            chain={chain}
+            onVerify={async () => {
+              await refreshAudit();
+              showToast("info", "Audit chain checked again.");
+            }}
+            onClose={() => setIsAuditLogOpen(false)}
           />
         )}
 
