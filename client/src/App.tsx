@@ -243,6 +243,27 @@ export const App: React.FC = () => {
       allowedCategories: [],
     });
 
+  /** One click for a first-time visitor: example mandate, then the buyer agent, then the Guardian's review. */
+  const handleGuidedDemo = () =>
+    act(async () => {
+      const created = await api.createMandate({
+        goal: "a birthday gift for my mom",
+        currency: "USD",
+        maxPerPurchase: 40,
+        maxMonthly: 100,
+        allowedCategories: [],
+      });
+      setMandates((prev) => [created, ...prev]);
+      setActiveMandate(created);
+      const res = await api.runShop(created.id);
+      if (res.record) {
+        setRecords((prev) => [res.record!, ...prev]);
+        showToast("success", "Mandate proposed a purchase and Guardian reviewed it. Open the row to see the signed receipt.");
+      } else {
+        showToast("info", "Mandate searched but found nothing to propose.");
+      }
+    });
+
   const handleCreateMandate = (data: Omit<Mandate, "id">) =>
     act(async () => {
       const created = await api.createMandate(data);
@@ -303,6 +324,7 @@ export const App: React.FC = () => {
         {!activeMandate && (
           <GettingStarted
             onUseExample={handleUseExampleMandate}
+            onGuidedDemo={handleGuidedDemo}
             onOpenRedTeam={() => setIsRedTeamOpen(true)}
             loading={loading}
             catalogIsDemo={systemHealth?.catalog !== "channel3"}

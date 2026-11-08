@@ -8,6 +8,33 @@ The idea: a buyer agent (**Mandate**) can only *propose* purchases inside the ru
 An independent auditor (**Guardian**) approves, blocks or asks a human *before* any PayPal payment,
 then reconciles what was charged and recommends a refund when something doesn't match.
 
+## Try it in two minutes (no keys, no PayPal login)
+
+1. Open the demo (or run `npm ci && npm run build && npm start`, then [localhost:3000](http://localhost:3000)).
+2. Press **Run a guided demo**: it creates an example mandate and runs the buyer agent. The Guardian
+   reviews the proposal against the rules and signs its approval. Without keys the products come from a
+   labeled offline demo catalog.
+3. Open the row and the **Receipt and trail** tab: the signed receipt (press **Verify signature**) and the
+   hash-chained timeline.
+4. Press **Red team** to throw 12 hostile proposals at the Guardian (forged prices, prompt injection,
+   salami slicing) and see what it did with each.
+5. To pay, you need a PayPal Sandbox buyer account and the server's demo key; see
+   [docs/PAYPAL-TESTING.md](docs/PAYPAL-TESTING.md).
+
+```mermaid
+flowchart LR
+  U[User sets a mandate] --> M[Mandate agent: proposes only]
+  M -->|proposal| G[Guardian: rules in code + AI reviewer]
+  G -->|reads the real price| C[(Channel3 catalog)]
+  G -->|signed receipt| P[Payment route]
+  P -->|only with a valid receipt| PP[PayPal Sandbox]
+  PP -->|capture| R[Guardian reconciles]
+  R -->|mismatch| F[Refund recommended + evidence packet]
+  G -.-> L[(Hash-chained audit log)]
+  P -.-> L
+  R -.-> L
+```
+
 ## What works today
 
 - **Guardian rules (deterministic code, no AI):** currency, per-purchase cap, monthly cap, allowed

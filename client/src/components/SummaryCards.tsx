@@ -93,7 +93,7 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ records, activeManda
             Approved
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-2 text-xs text-slate-800 mt-3 pt-2 border-t border-slate-100">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-slate-800 mt-3 pt-2 border-t border-slate-100">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1 text-slate-700 font-semibold">
               <ShieldAlert className="w-3.5 h-3.5 text-rose-700" /> Blocked:
@@ -131,7 +131,7 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ records, activeManda
             Orders created
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-2 text-xs text-slate-800 mt-3 pt-2 border-t border-slate-100">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-slate-800 mt-3 pt-2 border-t border-slate-100">
           <div className="flex items-center justify-between">
             <span className="text-slate-700 font-semibold">Awaiting buyer:</span>
             <span className="font-extrabold text-amber-900">{awaitingPaypalCount}</span>
@@ -165,7 +165,7 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ records, activeManda
             Reconciled
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-2 text-xs text-slate-800 mt-3 pt-2 border-t border-slate-100">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-slate-800 mt-3 pt-2 border-t border-slate-100">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1 text-slate-700 font-semibold">
               <AlertTriangle className="w-3.5 h-3.5 text-rose-700" /> Mismatches:

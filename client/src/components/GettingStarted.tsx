@@ -4,6 +4,7 @@ import { Bot, ShieldCheck, CreditCard, FileCheck2, Rocket, Info } from "lucide-r
 interface GettingStartedProps {
   onUseExample: () => void;
   onOpenRedTeam: () => void;
+  onGuidedDemo: () => void;
   loading: boolean;
   catalogIsDemo: boolean;
 }
@@ -15,7 +16,7 @@ const steps = [
   { icon: FileCheck2, title: "Guardian reconciles", text: "After the charge, the amount PayPal took is compared with what was approved, and a refund is recommended if it differs." },
 ];
 
-export const GettingStarted: React.FC<GettingStartedProps> = ({ onUseExample, onOpenRedTeam, loading, catalogIsDemo }) => (
+export const GettingStarted: React.FC<GettingStartedProps> = ({ onUseExample, onOpenRedTeam, onGuidedDemo, loading, catalogIsDemo }) => (
   <section aria-labelledby="getting-started-heading" className="bg-white rounded-2xl border border-slate-200/90 shadow-soft mb-6 overflow-hidden">
     <div className="p-5 sm:p-6 flex flex-wrap items-start justify-between gap-4 bg-gradient-to-r from-paypal-navy to-paypal-dark text-white">
       <div className="max-w-2xl">
@@ -27,12 +28,20 @@ export const GettingStarted: React.FC<GettingStartedProps> = ({ onUseExample, on
       </div>
       <div className="flex flex-wrap gap-2">
         <button
-          onClick={onUseExample}
+          onClick={onGuidedDemo}
           disabled={loading}
+          title="Creates the example mandate and runs the buyer agent in one click. No PayPal login needed."
           className="px-4 py-2.5 rounded-xl bg-paypal-gold hover:bg-paypal-goldHover text-paypal-navy font-black text-xs shadow-md transition-all flex items-center gap-2 disabled:opacity-60"
         >
           <Rocket className="w-4 h-4" aria-hidden="true" />
-          <span>Start with an example mandate</span>
+          <span>{loading ? "Running the demo..." : "Run a guided demo"}</span>
+        </button>
+        <button
+          onClick={onUseExample}
+          disabled={loading}
+          className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/30 transition-colors disabled:opacity-60"
+        >
+          <span>Only create the example mandate</span>
         </button>
         <button
           onClick={onOpenRedTeam}
