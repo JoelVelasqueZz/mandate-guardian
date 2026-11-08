@@ -53,8 +53,8 @@ export const RedTeamModal: React.FC<RedTeamModalProps> = ({ onClose, aiAvailable
             <div>
               <h3 id="redteam-title" className="text-lg font-extrabold text-slate-900">Red team: attacks on the live Guardian</h3>
               <p className="text-xs text-slate-600 mt-0.5 max-w-xl">
-                Hostile proposals go through the same Guardian code the app uses, on an isolated copy with an offline test
-                catalog. Your records and your money are never touched.
+                Hostile proposals and attacks on the evidence go through the same checks the app uses, on an isolated copy with an
+                offline test catalog. Your records and your money are never touched.
               </p>
             </div>
           </div>
@@ -84,7 +84,7 @@ export const RedTeamModal: React.FC<RedTeamModalProps> = ({ onClose, aiAvailable
                   {running && !report
                     ? "Running the attacks..."
                     : report
-                      ? `The Guardian held in ${report.held} of ${report.total} scenarios`
+                      ? `The Guardian held in ${report.held} of ${report.total} attacks`
                       : "No result yet"}
                 </div>
                 {report && (
@@ -161,6 +161,32 @@ export const RedTeamModal: React.FC<RedTeamModalProps> = ({ onClose, aiAvailable
                       </span>
                     ))}
                   </div>
+                </div>
+              </div>
+            </li>
+          ))}
+          {report && report.integrity.length > 0 && (
+            <li className="pt-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Attacks on the evidence itself</h4>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Not a bad purchase, but someone editing the signed receipt or the audit log afterwards.
+              </p>
+            </li>
+          )}
+          {report?.integrity.map((r) => (
+            <li key={r.id} className={`rounded-2xl border p-4 ${r.held ? "bg-white border-slate-200" : "bg-rose-50 border-rose-300"}`}>
+              <div className="flex items-start gap-3">
+                {r.held ? (
+                  <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" aria-label="Tampering was caught" />
+                ) : (
+                  <ShieldX className="w-5 h-5 text-rose-700 shrink-0 mt-0.5" aria-label="Tampering was not caught" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-extrabold text-slate-900">{r.name}</span>
+                  <p className="text-xs text-slate-700 mt-0.5">{r.attack}</p>
+                  <p className="text-[11px] mt-2 font-mono text-slate-800 bg-slate-100 border border-slate-200 rounded-lg px-2 py-1 break-words">
+                    {r.held ? "Caught: " : "Not caught: "}{r.detail}
+                  </p>
                 </div>
               </div>
             </li>

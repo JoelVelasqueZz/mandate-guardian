@@ -1,4 +1,4 @@
-import { AuditEvent, AuditRecord, ChainCheck, Mandate, RedTeamReport, SystemHealth } from "./types";
+import { AlternativesResponse, AuditEvent, AuditRecord, ChainCheck, Mandate, RedTeamReport, SystemHealth } from "./types";
 
 const authHeaders = (demoKey?: string) => {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -29,6 +29,12 @@ export const api = {
   getHealth: () => request<SystemHealth>("/api/health", "Could not reach the server."),
 
   getMandates: () => request<Mandate[]>("/api/mandates", "Could not load the mandates."),
+
+  getAlternatives: (id: string) =>
+    request<AlternativesResponse>(`/api/proposals/${id}/alternatives`, "Could not search for alternatives."),
+
+  swapProposal: (id: string, productId: string) =>
+    request<AuditRecord>(`/api/proposals/${id}/swap`, "Could not send the alternative to the Guardian.", post({ productId })),
 
   getAuditLog: () =>
     request<ChainCheck & { events: AuditEvent[] }>("/api/audit-log", "Could not load the audit log."),

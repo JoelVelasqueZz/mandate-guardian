@@ -191,11 +191,21 @@ describe("Red team", () => {
     const report = await runRedTeam();
     const failures = report.results.filter((r) => !r.held);
     expect(failures, JSON.stringify(failures)).toEqual([]);
-    expect(report.total).toBe(SCENARIOS.length);
+    expect(report.total).toBe(SCENARIOS.length + report.integrity.length);
     expect(report.isolated).toBe(true);
     expect(report.results.find((r) => r.id === "salami")?.failedRules).toContain("monthly_cap");
     expect(report.results.find((r) => r.id === "control")?.actual).toBe("approve");
     expect(report.results.find((r) => r.id === "human-threshold")?.actual).toBe("ask_human");
+  });
+
+  it("catches every attack on the evidence itself", async () => {
+    const { integrity } = await runRedTeam();
+    expect(integrity.map((r) => r.id)).toEqual([
+      "edit-receipt", "price-after-approval", "no-receipt", "foreign-key", "mandate-edit", "rewrite-history", "delete-event", "reorder-events",
+    ]);
+    expect(integrity.filter((r) => !r.held), JSON.stringify(integrity)).toEqual([]);
+    expect(integrity.find((r) => r.id === "rewrite-history")?.detail).toBe("Chain broken at event #2.");
+    expect(integrity.find((r) => r.id === "edit-receipt")?.detail).toMatch(/signature is not valid/);
   });
 
   it("cannot be talked into approving by a hostile model", async () => {

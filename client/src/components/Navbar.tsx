@@ -6,6 +6,7 @@ interface NavbarProps {
   systemHealth: SystemHealth | null;
   chain: ChainCheck | null;
   onOpenRedTeam: () => void;
+  onOpenAuditLog: () => void;
   demoKey: string;
   onOpenSettings: () => void;
   onRefresh: () => void;
@@ -16,6 +17,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   systemHealth,
   chain,
   onOpenRedTeam,
+  onOpenAuditLog,
   demoKey,
   onOpenSettings,
   onRefresh,
@@ -115,6 +117,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Key className="w-4 h-4" aria-hidden="true" />
             <span>{demoKey ? "Key set" : "Set key"}</span>
+          </button>
+
+          <button
+            onClick={onOpenAuditLog}
+            aria-label="Open the audit log"
+            title="Hash-chained audit log"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-300 transition-colors"
+          >
+            <Link2 className="w-4 h-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Audit log</span>
           </button>
 
           <button

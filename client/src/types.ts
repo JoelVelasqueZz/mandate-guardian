@@ -152,7 +152,31 @@ export interface RedTeamReport {
   catalog: string;
   aiUsed: boolean;
   results: RedTeamResult[];
+  integrity: IntegrityResult[];
   held: number;
   total: number;
 }
 
+export interface IntegrityResult {
+  id: string;
+  name: string;
+  attack: string;
+  held: boolean;
+  detail: string;
+}
+
+export interface Alternative {
+  productId: string;
+  title: string;
+  price: number;
+  currency: string;
+  merchant?: string;
+  url?: string;
+  imageUrl?: string;
+}
+
+export interface AlternativesResponse {
+  source: "channel3" | "demo";
+  alternatives: Alternative[];
+  maxPrice: number;
+}
