@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { compareReadings, PayPalSdkReader, sdkReaderFromEnv } from "../src/paypal/sdk-reader.js";
+import { CaptureStatus } from "@paypal/paypal-server-sdk";
+import { compareReadings, describeStatus, normalizeCapture, PayPalSdkReader, sdkReaderFromEnv, secondReading } from "../src/paypal/sdk-reader.js";
 import type { AuditRecord } from "../src/types.js";
 
 const record = (paypal: AuditRecord["paypal"]): AuditRecord => ({
@@ -25,6 +26,31 @@ describe("Second reading of a capture through PayPal's SDK", () => {
 
   it("does not fail on fields the SDK did not return", () => {
     expect(compareReadings(recorded, { status: "COMPLETED" }).agrees).toBe(true);
+  });
+
+  it("treats a thin capture as an unavailable reading, never as agreement or an alert", () => {
+    expect(() => normalizeCapture({})).toThrow("without a status or an amount");
+    expect(() => normalizeCapture({ status: CaptureStatus.Completed })).toThrow("without a status or an amount");
+    expect(() => normalizeCapture({ status: CaptureStatus.Completed, amount: { currencyCode: "USD", value: "abc" } })).toThrow("unreadable amount");
+  });
+
+  it("reads status, amount, currency and order from a complete capture", () => {
+    expect(normalizeCapture({
+      id: "CAP1", status: CaptureStatus.Completed, amount: { currencyCode: "USD", value: "17.99" },
+      supplementaryData: { relatedIds: { orderId: "ORDER1" } },
+    })).toEqual({ captureId: "CAP1", status: "COMPLETED", amount: 17.99, currency: "USD", orderId: "ORDER1" });
+  });
+
+  it("says whose fault an error status is", () => {
+    expect(describeStatus(401)).toContain("this app's credentials");
+    expect(describeStatus(403)).toContain("this app's credentials");
+    expect(describeStatus(404)).toContain("no capture with this id");
+    expect(describeStatus(503)).toContain("503");
+  });
+
+  it("reports an unreadable capture as unavailable through the second reading", async () => {
+    const reader = { readCapture: async () => normalizeCapture({}) };
+    expect(await secondReading(reader, recorded)).toMatchObject({ agrees: null, source: "paypal_server_sdk" });
   });
 
   it("is created only for Sandbox credentials and can be switched off", () => {

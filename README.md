@@ -133,7 +133,10 @@ flowchart LR
   disagree, the proposal goes to `alert` and the detail window and evidence packet say so. If the SDK
   cannot be reached, the app's own reading stands and the record says the second reading was not
   available. The reader only reads, and it is Sandbox only (it is not created for a production base URL).
-  Set `PAYPAL_SDK_CROSSCHECK=false` to switch it off.
+  Set `PAYPAL_SDK_CROSSCHECK=false` to switch it off. The contract for this read (the operation, the fields
+  that may be absent, what each error status means) is in [paypal-plan.md](paypal-plan.md), written with the
+  APIMatic Context Plugin for PayPal. The code uses PayPal's registry-published `@paypal/paypal-server-sdk`
+  rather than the plugin's own SDK, which is not on npm; the plan says why.
 - **Rate limits:** per-IP limits on `/api/mandates/:id/shop`, `/api/mandates/parse`,
   `/api/proposals` and `/api/redteam/run`.
 - **Natural-language mandates** (`src/mandate/parse-mandate.ts`, needs the AI model): turns a request

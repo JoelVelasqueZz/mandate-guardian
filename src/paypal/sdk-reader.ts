@@ -1,4 +1,4 @@
-import { ApiError, Client, Environment, PaymentsController } from "@paypal/paypal-server-sdk";
+import { ApiError, Client, Environment, PaymentsController, type CapturedPayment } from "@paypal/paypal-server-sdk";
 import type { AuditRecord } from "../types.js";
 
 /**
@@ -36,22 +36,41 @@ export class PayPalSdkReader implements SdkReader {
   }
 
   async readCapture(captureId: string): Promise<SdkCaptureReading> {
-    let result;
+    let result: CapturedPayment;
     try {
       ({ result } = await this.payments.getCapturedPayment({ captureId }));
     } catch (e) {
-      // The SDK's errors can have an empty message; say what PayPal answered instead.
-      if (e instanceof ApiError) throw new Error(`PayPal answered ${e.statusCode} for this capture`);
+      // The SDK's errors can have an empty message; say what PayPal answered, and whose fault it is.
+      if (e instanceof ApiError) throw new Error(describeStatus(e.statusCode));
       throw e;
     }
-    return {
-      captureId: result.id,
-      status: result.status,
-      amount: result.amount ? Number(result.amount.value) : undefined,
-      currency: result.amount?.currencyCode,
-      orderId: result.supplementaryData?.relatedIds?.orderId,
-    };
+    return normalizeCapture(result);
   }
+}
+
+/** What an error status means for this read. 401 and 403 are about this app's credentials, not the buyer's. */
+export function describeStatus(status: number): string {
+  if (status === 401 || status === 403) return `PayPal refused this app's credentials (${status})`;
+  if (status === 404) return "PayPal has no capture with this id (404)";
+  return `PayPal answered ${status} for this capture`;
+}
+
+/**
+ * Turns the SDK's capture into the fields the comparison uses. Every member of a capture is optional in the schema,
+ * so a thin or truncated 2xx decodes without complaint. Without a status and an amount there is nothing to compare,
+ * and that is an unavailable reading, never an agreement and never an alert.
+ */
+export function normalizeCapture(result: CapturedPayment): SdkCaptureReading {
+  if (!result.status || !result.amount) throw new Error("PayPal returned a capture without a status or an amount");
+  const amount = Number(result.amount.value);
+  if (!Number.isFinite(amount)) throw new Error("PayPal returned a capture with an unreadable amount");
+  return {
+    captureId: result.id,
+    status: result.status,
+    amount,
+    currency: result.amount.currencyCode,
+    orderId: result.supplementaryData?.relatedIds?.orderId,
+  };
 }
 
 /** Undefined when there are no Sandbox credentials, when the base URL is not Sandbox, or when it is switched off. */
