@@ -86,30 +86,32 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ records, activeManda
           </span>
         </div>
         <div className="flex items-baseline gap-2 mb-2">
-          <span className="text-2xl font-black text-slate-950 tracking-tight">
-            {approvedCount}
+          <span className="text-2xl font-black text-emerald-900 tracking-tight">
+            ${stoppedValue.toFixed(2)}
           </span>
           <span className="text-xs font-bold text-emerald-950 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
-            Approved
+            Stopped before payment
           </span>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-slate-800 mt-3 pt-2 border-t border-slate-100">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <span className="flex items-center gap-1 text-slate-700 font-semibold">
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-700" /> Approved:
+            </span>
+            <span className="font-extrabold text-slate-950">{approvedCount}</span>
+          </div>
+          <div className="flex items-center justify-between gap-1">
             <span className="flex items-center gap-1 text-slate-700 font-semibold">
               <ShieldAlert className="w-3.5 h-3.5 text-rose-700" /> Blocked:
             </span>
             <span className="font-extrabold text-slate-950">{blockedCount}</span>
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-1">
             <span className="flex items-center gap-1 text-slate-700 font-semibold">
               <Clock className="w-3.5 h-3.5 text-amber-700" /> Needs a human:
             </span>
             <span className="font-extrabold text-amber-900">{awaitingHumanCount}</span>
           </div>
-        </div>
-        <div className="flex items-center justify-between text-xs mt-2 pt-2 border-t border-slate-100">
-          <span className="text-slate-700 font-semibold">Stopped before payment:</span>
-          <span className="font-extrabold text-emerald-900">${stoppedValue.toFixed(2)}</span>
         </div>
       </div>
 
