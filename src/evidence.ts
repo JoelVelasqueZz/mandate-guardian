@@ -95,6 +95,9 @@ export function evidenceMarkdown(e: Evidence): string {
     e.reconciliation
       ? `${e.reconciliation.match ? "Match" : "**Mismatch**"}: ${e.reconciliation.detail}${e.simulated ? " This mismatch was **simulated** by the demo scenario; the real PayPal charge was not changed." : ""}`
       : "Not reconciled yet.",
+    ...(e.reconciliation?.crossCheck
+      ? [`Second reading (PayPal Server SDK): ${e.reconciliation.crossCheck.agrees === null ? "not available" : e.reconciliation.crossCheck.agrees ? "agrees" : "**disagrees**"}. ${e.reconciliation.crossCheck.detail}`]
+      : []),
     "",
     "## Timeline (hash-chained)",
     ...e.timeline.map((t) => `- #${t.seq} ${t.at} ${t.type}: ${t.detail} (hash ${t.hash.slice(0, 12)})`),

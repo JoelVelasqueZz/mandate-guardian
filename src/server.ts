@@ -19,6 +19,7 @@ import { parseMandateText } from "./mandate/parse-mandate.js";
 import { Store } from "./store.js";
 import { createPayPalRouter, demoKeyGate } from "./paypal/routes.js";
 import { createAiTurnHandler } from "./ai-turn.js";
+import { sdkReaderFromEnv } from "./paypal/sdk-reader.js";
 
 const app = express();
 app.set("trust proxy", 1); // behind Render's proxy, so rate limits see the real client address
@@ -143,6 +144,7 @@ app.post("/api/proposals/:id/swap", limitShop, async (req, res) => {
 
 // PayPal sandbox flows, callbacks and reconciliation.
 app.use(createPayPalRouter(store, {
+  sdkReader: sdkReaderFromEnv(process.env), // second, independent reading of each capture (Sandbox only)
   verifyApproval: (record) => signer.checkRecord(record, store.mandates.get(record.proposal.mandateId)),
   onHumanConfirm: (record) => {
     const mandate = store.mandates.get(record.proposal.mandateId);

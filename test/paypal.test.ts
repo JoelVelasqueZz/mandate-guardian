@@ -5,6 +5,7 @@ import type { AddressInfo } from "node:net";
 import { Store } from "../src/store.js";
 import { createPayPalRouter } from "../src/paypal/routes.js";
 import { PayPalClient, requestIdFor, usdValue, type PayPalOrder, type Payment } from "../src/paypal/client.js";
+import type { SdkCaptureReading } from "../src/paypal/sdk-reader.js";
 import type { AuditRecord } from "../src/types.js";
 
 describe("PayPal client contract (mock HTTP, no sandbox credentials)", () => {
@@ -60,6 +61,8 @@ describe("PayPal API flow (mock provider)", () => {
   let env: NodeJS.ProcessEnv;
   let order: PayPalOrder, capture: Payment, refund: Payment, authStatus: string;
   let fake: { [key: string]: ReturnType<typeof vi.fn> };
+  // What PayPal's official SDK "sees" for the capture, or an error when that reading is unavailable.
+  let sdkReading: SdkCaptureReading | Error;
   const key = "local-test-key";
   async function api(path: string, body: unknown = {}, method = "POST", authorized = true) {
     const result = await fetch(origin + path, { method, headers: {
@@ -80,6 +83,7 @@ describe("PayPal API flow (mock provider)", () => {
       purchase_units: [{ amount: { currency_code: "USD", value: "10.00" }, payments: {} }] };
     capture = { id: "CAPTURE1", status: "COMPLETED", amount: { value: "10.00", currency_code: "USD" } };
     refund = { id: "REFUND1", status: "COMPLETED" };
+    sdkReading = { captureId: "CAPTURE1", status: "COMPLETED", amount: 10, currency: "USD", orderId: "ORDER1" };
     authStatus = "CREATED";
     fake = {
       createOrder: vi.fn(async (_a, _c, _d, intent) => { order.intent = intent; return structuredClone(order); }),
@@ -100,7 +104,11 @@ describe("PayPal API flow (mock provider)", () => {
     };
     const app = express();
     app.use(express.json());
-    app.use(createPayPalRouter(store, { env, client: fake as unknown as PayPalClient }));
+    app.use(createPayPalRouter(store, {
+      env,
+      client: fake as unknown as PayPalClient,
+      sdkReader: { readCapture: async () => { if (sdkReading instanceof Error) throw sdkReading; return sdkReading; } },
+    }));
     server = await new Promise<Server>(resolve => { const s = app.listen(0, "127.0.0.1", () => resolve(s)); });
     origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });
@@ -247,6 +255,28 @@ describe("PayPal API flow (mock provider)", () => {
     expect(result.body.status).toBe("alert");
     expect(result.body.paypal.charged).toBe(12);
     expect(result.body.reconciliation.source).toBe("paypal_capture");
+  });
+  it("records a second reading through the official SDK when it agrees", async () => {
+    await captured();
+    const result = await api(endpoint("reconcile"));
+    expect(result.body.status).toBe("reconciled");
+    expect(result.body.reconciliation.crossCheck).toMatchObject({ source: "paypal_server_sdk", agrees: true });
+  });
+  it("raises an alert when the SDK reads something different from the app's own reading", async () => {
+    await captured();
+    sdkReading = { captureId: "CAPTURE1", status: "COMPLETED", amount: 1, currency: "USD", orderId: "ORDER1" };
+    const result = await api(endpoint("reconcile"));
+    expect(result.body.status).toBe("alert");
+    expect(result.body.reconciliation.crossCheck.agrees).toBe(false);
+    expect(result.body.reconciliation.detail).toContain("two readings of PayPal disagree");
+  });
+  it("keeps the app's own reading when the SDK cannot be reached, and says so", async () => {
+    await captured();
+    sdkReading = new Error("socket hang up");
+    const result = await api(endpoint("reconcile"));
+    expect(result.body.status).toBe("reconciled");
+    expect(result.body.reconciliation.crossCheck).toMatchObject({ agrees: null });
+    expect(result.body.reconciliation.crossCheck.detail).toContain("socket hang up");
   });
   it("labels simulated overcharges and preserves the actual captured amount", async () => {
     await captured();

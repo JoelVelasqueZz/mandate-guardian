@@ -5,6 +5,7 @@ import type { Store } from "../store.js";
 import type { AuditRecord } from "../types.js";
 import { runRules } from "../guardian/rules.js";
 import { reconcile } from "../guardian/reconcile.js";
+import { secondReading, type SdkReader } from "./sdk-reader.js";
 import { paypalFromEnv, PayPalError, requestIdFor, approvalUrl, firstAuthorization, firstCapture,
   type PayPalClient, type PayPalOrder, type Payment } from "./client.js";
 
@@ -42,6 +43,8 @@ export function createPayPalRouter(store: Store, options: {
   verifyApproval?: (record: AuditRecord) => string | undefined;
   /** Called when a human confirms a proposal, before it becomes approved (the server issues the receipt here). */
   onHumanConfirm?: (record: AuditRecord) => void;
+  /** Reads a capture a second time through PayPal's official SDK, so reconciliation can compare two readings. */
+  sdkReader?: SdkReader;
 } = {}) {
   const env = options.env ?? process.env;
   let cached = options.client;
@@ -217,6 +220,15 @@ export function createPayPalRouter(store: Store, options: {
     const currencyMatches = capture.amount?.currency_code === record.proposal.currency;
     record.reconciliation = currencyMatches ? { ...reconcile(record), source: "paypal_capture" } : {
       match: false, detail: "PayPal currency differs from the approved currency.", source: "paypal_capture" };
+    // A second reading of the same capture through PayPal's official SDK. If the two disagree, alert.
+    if (options.sdkReader) {
+      const crossCheck = await secondReading(options.sdkReader, record);
+      record.reconciliation.crossCheck = crossCheck;
+      if (crossCheck.agrees === false) {
+        record.reconciliation.match = false;
+        record.reconciliation.detail = `${record.reconciliation.detail} ${crossCheck.detail}`;
+      }
+    }
     record.status = record.reconciliation.match ? "reconciled" : "alert";
     store.upsert(record);
     res.json(record);

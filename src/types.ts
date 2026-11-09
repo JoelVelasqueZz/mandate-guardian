@@ -103,7 +103,13 @@ export interface AuditRecord {
     refundId?: string;
     charged?: number;
   };
-  reconciliation?: { match: boolean; detail: string; source?: "paypal_capture" | "simulated" };
+  reconciliation?: {
+    match: boolean;
+    detail: string;
+    source?: "paypal_capture" | "simulated";
+    /** A second reading of the same capture through PayPal's official SDK. `agrees: null` means it could not be read. */
+    crossCheck?: { source: "paypal_server_sdk"; agrees: boolean | null; detail: string };
+  };
   demo?: { simulated: true; charged: number };
   createdAt?: string;
   updatedAt: string;

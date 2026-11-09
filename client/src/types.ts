@@ -79,6 +79,7 @@ export interface AuditRecord {
     match: boolean;
     detail: string;
     source?: "paypal_capture" | "simulated";
+    crossCheck?: { source: "paypal_server_sdk"; agrees: boolean | null; detail: string };
   };
   demo?: {
     simulated: true;

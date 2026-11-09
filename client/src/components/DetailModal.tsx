@@ -386,6 +386,14 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                         {reconciliation.match ? "Reconciled: amounts match" : "Mismatch alert"}
                       </span>
                       <p className="text-xs text-slate-600">{reconciliation.detail}</p>
+                      {reconciliation.crossCheck && (
+                        <p className={`mt-2 text-[11px] font-semibold ${
+                          reconciliation.crossCheck.agrees === false ? "text-rose-800" : reconciliation.crossCheck.agrees ? "text-emerald-800" : "text-slate-600"
+                        }`}>
+                          Second reading (PayPal SDK): {reconciliation.crossCheck.agrees === null ? "not available" : reconciliation.crossCheck.agrees ? "agrees" : "disagrees"}.{" "}
+                          <span className="font-normal">{reconciliation.crossCheck.detail}</span>
+                        </p>
+                      )}
                       {demo?.simulated && (
                         <span className="mt-2 inline-block text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
                           Simulated Scenario (ENABLE_DEMO_SCENARIO)
