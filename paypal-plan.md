@@ -91,8 +91,10 @@ whose legal set another operation defines.
 
 ## Assumptions and blockers
 
-- **Not verified against a real capture of this app's own Sandbox account.** The SDK authenticated and reached PayPal
-  (a nonexistent capture answers 404). The capture ids in `docs/SANDBOX-RESULTS.md` belong to another Sandbox app and
-  answer 401 with this app's credentials. The first Plan A run shows the second reading in the detail window.
+- **Verified against a real capture of this app's own Sandbox account on November 9, 2026**, on the public Render
+  deployment: a USD 17.99 capture was read through the SDK and the detail window reported "Second reading (PayPal SDK):
+  agrees" (17.99 USD, `COMPLETED`). Before that, the SDK had authenticated and reached PayPal (a nonexistent capture
+  answers 404). The capture ids in `docs/SANDBOX-RESULTS.md` belong to another Sandbox app and answer 401 with this
+  app's credentials, which is why the check needed a capture made by this app.
 - `order_id` inside `related_ids` is typed in the SDK this repo uses, but the plugin's map entry for it was not
   opened, so that comparison rests on the 2.5.0 types alone.
