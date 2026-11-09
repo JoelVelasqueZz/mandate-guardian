@@ -163,6 +163,7 @@ See the [PayPal Sandbox setup, demo run and Render instructions](docs/PAYPAL-TES
 | Local integrated run | November 4, 2026, one machine, live Channel3, Gemini and PayPal Sandbox, driven from the dashboard: order, buyer approval, authorize, capture, reconcile, human confirmation, simulated overcharge, full refund, and a voided authorization. Voiding released the buyer's hold: the Sandbox available balance rose by the voided amount. Details in [Sandbox results](docs/SANDBOX-RESULTS.md). |
 | Render | Verified on November 4, 2026. The [public Render deployment](https://mandate-guardian-demo.onrender.com) completed two Plan A rounds against PayPal Sandbox. The buyer returned to the public HTTPS `/paypal/return` URL, and [`/api/health`](https://mandate-guardian-demo.onrender.com/api/health) reported `ok: true` and `paypalPlan: "A"`. |
 | Second reading (PayPal SDK) | November 9, 2026, on the public Render deployment, one Plan A round with a Sandbox Personal buyer: a USD 17.99 order was approved by the buyer, authorized, captured and reconciled. Reconciliation reported "amounts match", and the second reading through `@paypal/paypal-server-sdk` read the same capture (USD 17.99, `COMPLETED`) and agreed. A simulated overcharge then raised the alert and the refund completed. |
+
 Both Render rounds recorded `completed: true`. The Guardian blocked a USD 55.00
 proposal because it exceeded the USD 40.00 cap and differed from the catalog price.
 Each USD 24.00 capture matched the approved amount. A simulated USD 32.50 charge
