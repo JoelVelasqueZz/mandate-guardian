@@ -12,6 +12,8 @@ import { CheckCircle2, AlertCircle, Info, X } from "lucide-react";
 const DetailModal = lazy(() => import("./components/DetailModal").then((m) => ({ default: m.DetailModal })));
 const RedTeamModal = lazy(() => import("./components/RedTeamModal").then((m) => ({ default: m.RedTeamModal })));
 const AuditLogModal = lazy(() => import("./components/AuditLogModal").then((m) => ({ default: m.AuditLogModal })));
+// AG Studio is a large library, so it loads only when the analytics window is opened.
+const AnalyticsModal = lazy(() => import("./components/AnalyticsModal").then((m) => ({ default: m.AnalyticsModal })));
 const SettingsModal = lazy(() => import("./components/SettingsModal").then((m) => ({ default: m.SettingsModal })));
 
 const DEMO_KEY_STORAGE = "mg_demo_key";
@@ -36,6 +38,7 @@ export const App: React.FC = () => {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [isRedTeamOpen, setIsRedTeamOpen] = useState(false);
   const [isAuditLogOpen, setIsAuditLogOpen] = useState(false);
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -328,6 +331,7 @@ export const App: React.FC = () => {
         chain={chain}
         onOpenRedTeam={() => setIsRedTeamOpen(true)}
         onOpenAuditLog={() => setIsAuditLogOpen(true)}
+        onOpenAnalytics={() => { void refreshAudit(); setIsAnalyticsOpen(true); }}
         demoKey={demoKey}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onRefresh={() => refresh()}
@@ -417,6 +421,16 @@ export const App: React.FC = () => {
               showToast("info", "Audit chain checked again.");
             }}
             onClose={() => setIsAuditLogOpen(false)}
+          />
+        )}
+
+        {isAnalyticsOpen && (
+          <AnalyticsModal
+            records={records}
+            events={events}
+            demoKey={demoKey}
+            aiEnabled={Boolean(systemHealth?.ai)}
+            onClose={() => setIsAnalyticsOpen(false)}
           />
         )}
 

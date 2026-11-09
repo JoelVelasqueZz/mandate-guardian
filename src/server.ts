@@ -18,11 +18,12 @@ import { runMandate } from "./mandate/agent.js";
 import { parseMandateText } from "./mandate/parse-mandate.js";
 import { Store } from "./store.js";
 import { createPayPalRouter, demoKeyGate } from "./paypal/routes.js";
+import { createAiTurnHandler } from "./ai-turn.js";
 
 const app = express();
 app.set("trust proxy", 1); // behind Render's proxy, so rate limits see the real client address
 app.use(compression());
-app.use(express.json());
+app.use(express.json({ limit: "1mb" })); // the Studio assistant sends conversation history
 
 // Security and Best Practices HTTP headers
 app.use((_req, res, next) => {
@@ -44,6 +45,11 @@ const limitParse = rateLimit({ windowMs: 60_000, max: 20 });
 const limitProposals = rateLimit({ windowMs: 60_000, max: 60 });
 const limitRedTeam = rateLimit({ windowMs: 60_000, max: 10 });
 const demoKey = demoKeyGate(process.env);
+const limitAssistant = rateLimit({ windowMs: 60_000, max: 30 });
+
+// The analytics assistant (AG Studio) talks to Gemini through this route, so the key and model stay on the
+// server. It needs the demo key like every route that spends quota, and it can only read dashboard data.
+app.post("/api/ai/turn", limitAssistant, demoKey, createAiTurnHandler({ apiKey: process.env.AI_API_KEY, model: process.env.AI_MODEL }));
 
 app.get("/api/health", (_req, res) => res.json({
   ok: true, catalog: catalog.source, ai: Boolean(llm),
