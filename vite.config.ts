@@ -5,6 +5,9 @@ import path from "node:path";
 export default defineConfig({
   plugins: [react()],
   root: "client",
+  // Read VITE_* variables (such as VITE_AG_STUDIO) from the repository's .env, not from client/.
+  // Only variables with the VITE_ prefix reach the browser bundle.
+  envDir: path.resolve(__dirname),
   build: {
     outDir: "../dist/client",
     emptyOutDir: true,

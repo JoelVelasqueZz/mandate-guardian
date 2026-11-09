@@ -1,5 +1,5 @@
 import React from "react";
-import { ShieldCheck, ShoppingBag, Database, Key, RefreshCw, Sparkles, Link2, Swords } from "lucide-react";
+import { ShieldCheck, ShoppingBag, Database, Key, RefreshCw, Sparkles, Link2, Swords, BarChart3 } from "lucide-react";
 import { ChainCheck, SystemHealth } from "../types";
 
 interface NavbarProps {
@@ -7,6 +7,7 @@ interface NavbarProps {
   chain: ChainCheck | null;
   onOpenRedTeam: () => void;
   onOpenAuditLog: () => void;
+  onOpenAnalytics: () => void;
   demoKey: string;
   onOpenSettings: () => void;
   onRefresh: () => void;
@@ -18,6 +19,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   chain,
   onOpenRedTeam,
   onOpenAuditLog,
+  onOpenAnalytics,
   demoKey,
   onOpenSettings,
   onRefresh,
@@ -117,6 +119,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Key className="w-4 h-4" aria-hidden="true" />
             <span>{demoKey ? "Key set" : "Set key"}</span>
+          </button>
+
+          <button
+            onClick={onOpenAnalytics}
+            aria-label="Open the analytics: charts and an assistant over the audit data"
+            title="Analytics with an AI assistant"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 transition-colors"
+          >
+            <BarChart3 className="w-4 h-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Analytics</span>
           </button>
 
           <button

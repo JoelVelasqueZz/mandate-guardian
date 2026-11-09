@@ -111,6 +111,18 @@ flowchart LR
 - **Audit log table** (AG Grid): the "Audit log" window lists every chained event with its hash and what it
   links to, with filters, search, CSV export, a live total row and a flash on new events. It uses AG Grid
   Community only.
+- **Guardian analytics** (AG Studio, the "Analytics" button): a self-serve report over the live audit data
+  (proposals, rule findings and the audit events), opened with a ready dashboard of tiles, charts and a
+  grid. Users drag in their own widgets, and an AI assistant (Gemini) answers questions and builds widgets
+  from the chat. It is a custom lead agent, "Guardian Analyst", that keeps Studio's own tools and can hand
+  work to Studio's data, page, planning and widget agents and to a second custom agent, "Anomaly Watch".
+  It has one tool of its own, `explainGuardianDecision`, which reads the Guardian's written reasoning
+  (blocked, why, and what would have let it pass). The assistant only reads dashboard data and arranges
+  widgets in the browser; it cannot approve, pay or refund. Gemini is reached through
+  `POST /api/ai/turn` (`src/ai-turn.ts`), so the key and model stay on the server, and the route needs the
+  demo key and is rate limited. Without `AI_API_KEY` the report still works without the assistant.
+  AG Studio is a commercial library: it runs without a licence key and shows an evaluation watermark.
+  Set `VITE_AG_STUDIO` when building to remove it (AG Grid offers a free 45-day trial key).
 - **Fix hints and evidence packet:** a failed rule says what would have to change for it to pass
   (deterministic text, not from a model). `GET /api/proposals/:id/evidence?format=md` (demo key)
   returns the decision, receipt, PayPal IDs, reconciliation and the hash-chained timeline for one
@@ -182,6 +194,7 @@ Copy `.env.example` to `.env` and fill only what you need. Never commit `.env`.
 |---|---|
 | `AI_API_KEY`, `AI_MODEL` | AI reviewer, buyer agent and natural-language mandates (Google AI Studio key). Empty: rules only. |
 | `CHANNEL3_API_KEY` | Live product search. Empty: labeled offline demo catalog. |
+| `VITE_AG_STUDIO` | Optional AG Studio licence key, read at **build time** (`npm run build`). Empty: the analytics window works and shows an evaluation watermark. |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | PayPal **Sandbox** app credentials. |
 | `PAYPAL_PLAN`, `APP_BASE_URL` | Set Plan A. For local runs, set the app origin. Render provides the HTTPS origin when `APP_BASE_URL` is unset. |
 | `DEMO_API_KEY` | **Required for human confirmation and payment routes.** Set it to a random string of your own; it is a shared demo access key, not a PayPal credential. Without it the payment routes answer 503. Clients send `Authorization: Bearer <DEMO_API_KEY>`. |
@@ -224,6 +237,7 @@ authentication; this is a single-user demo API.
 | POST | `/api/proposals/:id/confirm` | demo key | A human confirms a proposal the Guardian flagged |
 | GET | `/api/proposals/:id/alternatives` | none | Products from the catalog that fit the mandate (blocked proposals only) |
 | POST | `/api/proposals/:id/swap` | none | Send one of those products back through the Guardian as a new proposal |
+| POST | `/api/ai/turn` | demo key | One turn of the analytics assistant: the conversation in, Gemini's text and tool calls out. The model and key are the server's. |
 | GET | `/api/guardian/public-key` | none | Public key that verifies the Guardian's receipts |
 | GET | `/api/proposals/:id/receipt` | none | The Guardian's signed receipt for an approved proposal |
 | POST | `/api/receipts/verify` | none | Check a receipt's signature |
