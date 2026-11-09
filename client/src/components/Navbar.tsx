@@ -27,10 +27,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-soft">
-      <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
+      <div className="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 min-h-[4.5rem] py-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         {/* Brand identity: PayPal + Channel3 + Mandate Guardian */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-paypal-navy to-paypal-vibrant shadow-md text-white font-bold">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center justify-center w-11 h-11 shrink-0 rounded-xl bg-gradient-to-br from-paypal-navy to-paypal-vibrant shadow-md text-white font-bold">
             <ShieldCheck className="w-6 h-6 text-paypal-gold" aria-hidden="true" />
           </div>
           <div>
@@ -40,16 +40,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="text-slate-500 font-light" aria-hidden="true">&</span>
                 <span className="text-paypal-vibrant">Guardian</span>
               </span>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-950 border border-blue-300">
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap bg-blue-100 text-blue-950 border border-blue-300">
                 <span className="w-1.5 h-1.5 rounded-full bg-paypal-vibrant animate-pulse" aria-hidden="true"></span>
                 PayPal Sandbox
               </span>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-950 border border-indigo-300">
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap bg-indigo-100 text-indigo-950 border border-indigo-300">
                 <ShoppingBag className="w-3 h-3 text-indigo-700" aria-hidden="true" />
                 Channel3
               </span>
             </div>
-            <p className="text-xs text-slate-600 font-semibold">
+            <p className="hidden md:block text-xs text-slate-600 font-semibold">
               Trust layer and independent auditor for AI shopping agents
             </p>
           </div>
@@ -105,7 +105,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </nav>
 
         {/* Right side controls */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Narrow windows hide the status badges, so the key needs its own always-visible button. */}
           <button
             onClick={onOpenSettings}
