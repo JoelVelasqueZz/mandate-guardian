@@ -127,6 +127,13 @@ flowchart LR
   (deterministic text, not from a model). `GET /api/proposals/:id/evidence?format=md` (demo key)
   returns the decision, receipt, PayPal IDs, reconciliation and the hash-chained timeline for one
   proposal. It supports a dispute; it does not file one.
+- **Second reading through PayPal's official SDK** (`src/paypal/sdk-reader.ts`): when it reconciles a
+  capture, the Guardian reads it a second time with `@paypal/paypal-server-sdk` (a different code path
+  from the app's own fetch client) and compares status, amount, currency and order. If the two readings
+  disagree, the proposal goes to `alert` and the detail window and evidence packet say so. If the SDK
+  cannot be reached, the app's own reading stands and the record says the second reading was not
+  available. The reader only reads, and it is Sandbox only (it is not created for a production base URL).
+  Set `PAYPAL_SDK_CROSSCHECK=false` to switch it off.
 - **Rate limits:** per-IP limits on `/api/mandates/:id/shop`, `/api/mandates/parse`,
   `/api/proposals` and `/api/redteam/run`.
 - **Natural-language mandates** (`src/mandate/parse-mandate.ts`, needs the AI model): turns a request
@@ -199,6 +206,7 @@ Copy `.env.example` to `.env` and fill only what you need. Never commit `.env`.
 | `PAYPAL_PLAN`, `APP_BASE_URL` | Set Plan A. For local runs, set the app origin. Render provides the HTTPS origin when `APP_BASE_URL` is unset. |
 | `DEMO_API_KEY` | **Required for human confirmation and payment routes.** Set it to a random string of your own; it is a shared demo access key, not a PayPal credential. Without it the payment routes answer 503. Clients send `Authorization: Bearer <DEMO_API_KEY>`. |
 | `ENABLE_DEMO_SCENARIO` | Optional: `true` enables the labeled simulated overcharge. |
+| `PAYPAL_SDK_CROSSCHECK` | Optional: `false` turns off the second reading through the PayPal SDK. |
 
 Use `npm run smoke:paypal` for a direct Sandbox order or
 `npm run verify:plan-a` for the integrated demo with its buyer approval and refund prompts.

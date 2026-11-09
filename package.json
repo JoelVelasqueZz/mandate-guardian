@@ -20,6 +20,7 @@
     "verify:plan-a": "tsx scripts/verify-plan-a.ts"
   },
   "dependencies": {
+    "@paypal/paypal-server-sdk": "^2.5.0",
     "ag-grid-community": "^36.3.0",
     "ag-grid-react": "^36.3.0",
     "ag-studio": "^3.1.0",
